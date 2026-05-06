@@ -1,39 +1,100 @@
-## Telegram messenger for Android
+# FenixUz
 
-[Telegram](https://telegram.org) is a messaging app with a focus on speed and security. It’s superfast, simple and free.
-This repo contains the official source code for [Telegram App for Android](https://play.google.com/store/apps/details?id=org.telegram.messenger).
+FenixUz is an unofficial Telegram client for Android, developed by **VipAds LLC** in Uzbekistan.
 
-## Creating your Telegram Application
+## About
 
-We welcome all developers to use our API and source code to create applications on our platform.
-There are several things we require from **all developers** for the moment.
+FenixUz is a fork of [Telegram for Android](https://github.com/DrKLO/Telegram), the official Telegram messenger application. It provides the same core messaging features under an alternative brand, distributed independently.
 
-1. [**Obtain your own api_id**](https://core.telegram.org/api/obtaining_api_id) for your application.
-2. Please **do not** use the name Telegram for your app — or make sure your users understand that it is unofficial.
-3. Kindly **do not** use our standard logo (white paper plane in a blue circle) as your app's logo.
-3. Please study our [**security guidelines**](https://core.telegram.org/mtproto/security_guidelines) and take good care of your users' data and privacy.
-4. Please remember to publish **your** code too in order to comply with the licences.
+## License
 
-### API, Protocol documentation
+This project is licensed under the **GNU General Public License v2.0 (GPLv2)**, the same license used by the original Telegram for Android source code. See the [LICENSE](LICENSE) file for details.
 
-Telegram API manuals: https://core.telegram.org/api
+## Disclaimer
 
-MTproto protocol manuals: https://core.telegram.org/mtproto
+FenixUz is an unofficial third-party client and is **not affiliated with, endorsed by, or sponsored by** Telegram FZ-LLC or Telegram Messenger Inc. "Telegram" is a trademark of Telegram FZ-LLC.
 
-### Compilation Guide
+## Privacy Policy
 
-**Note**: In order to support [reproducible builds](https://core.telegram.org/reproducible-builds), this repo contains dummy release.keystore,  google-services.json and filled variables inside BuildVars.java. Before publishing your own APKs please make sure to replace all these files with your own.
+See [Privacy Policy](PRIVACY-URL) for details on how the app handles user data.
 
-You will require Android Studio 3.4, Android NDK rev. 20 and Android SDK 8.1
+## Building from Source
 
-1. Download the Telegram source code from https://github.com/DrKLO/Telegram ( git clone https://github.com/DrKLO/Telegram.git )
-2. Copy your release.keystore into TMessagesProj/config
-3. Fill out RELEASE_KEY_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_STORE_PASSWORD in gradle.properties to access your  release.keystore
-4.  Go to https://console.firebase.google.com/, create two android apps with application IDs org.telegram.messenger and org.telegram.messenger.beta, turn on firebase messaging and download google-services.json, which should be copied to the same folder as TMessagesProj.
-5. Open the project in the Studio (note that it should be opened, NOT imported).
-6. Fill out values in TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java – there’s a link for each of the variables showing where and which data to obtain.
-7. You are ready to compile Telegram.
+### Requirements
 
-### Localization
+- Android Studio (latest stable)
+- Android SDK 35
+- NDK (installed automatically via Gradle)
+- JDK 17
+- Your own Telegram API credentials from [my.telegram.org](https://my.telegram.org)
+- Your own Firebase project (for FCM push notifications)
+- Your own release keystore for signing
 
-We moved all translations to https://translations.telegram.org/en/android/. Please use it.
+### Setup Steps
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/Fenix-Uz/android.git
+   cd android
+   ```
+
+2. **Configure `local.properties`:**
+
+   Copy the example file and fill in your values:
+   ```bash
+   cp local.properties.example local.properties
+   ```
+   Then edit `local.properties`:
+   ```properties
+   sdk.dir=/path/to/your/Android/Sdk
+   TELEGRAM_APP_ID=your_app_id
+   TELEGRAM_APP_HASH=your_app_hash
+   ```
+
+3. **Configure `gradle.properties`:**
+
+   Copy the example file and fill in your keystore credentials:
+   ```bash
+   cp gradle.properties.example gradle.properties
+   ```
+   Then edit `gradle.properties`:
+   ```properties
+   RELEASE_KEY_PASSWORD=your_password
+   RELEASE_KEY_ALIAS=your_alias
+   RELEASE_STORE_PASSWORD=your_store_password
+   ```
+
+4. **Add your `google-services.json`:**
+
+   Create a Firebase project at [console.firebase.google.com](https://console.firebase.google.com) with your application package (e.g. `uz.codingtech.messenger`) and download `google-services.json` into the following directories:
+   - `TMessagesProj/`
+   - `TMessagesProj_App/`
+   - `TMessagesProj_AppHockeyApp/`
+   - `TMessagesProj_AppHuawei/`
+   - `TMessagesProj_AppStandalone/`
+
+5. **Place your `release.keystore`:**
+
+   Generate your own keystore and place it at:
+   ```
+   TMessagesProj/config/release.keystore
+   ```
+
+6. **Build the project:**
+   ```bash
+   ./gradlew :TMessagesProj_App:assembleAfatRelease
+   ```
+
+   Or open the project in Android Studio and build via **Build → Build Bundle(s) / APK(s)**.
+
+> **Note:** `local.properties`, `gradle.properties`, `google-services.json`, and `*.keystore` files are gitignored and must **never** be committed to version control.
+
+## Credits
+
+- Based on [Telegram for Android](https://github.com/DrKLO/Telegram) by Telegram FZ-LLC and contributors
+- Maintained by **VipAds LLC**
+
+## Contact
+
+- **Email:** vipadsllc@gmail.com
+- **Developer:** VipAds LLC, Tashkent, Uzbekistan
