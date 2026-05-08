@@ -3,7 +3,7 @@
 
 APP_VERSION_CODE=1
 APP_VERSION_NAME=1.0.0
-APP_PACKAGE=uz.codingtech.messenger
+APP_PACKAGE=uz.codingtech.messengerapp
 IS_PRIVATE=false
 
 # Release signing - fill these with your own keystore credentials

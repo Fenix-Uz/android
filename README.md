@@ -66,7 +66,7 @@ See [Privacy Policy](https://fenixuz.uz/privacy.html) for details on how the app
 
 4. **Add your `google-services.json`:**
 
-   Create a Firebase project at [console.firebase.google.com](https://console.firebase.google.com) with your application package (e.g. `uz.codingtech.messenger`) and download `google-services.json` into the following directories:
+   Create a Firebase project at [console.firebase.google.com](https://console.firebase.google.com) with your application package (e.g. `uz.codingtech.messengerapp`) and download `google-services.json` into the following directories:
    - `TMessagesProj/`
    - `TMessagesProj_App/`
    - `TMessagesProj_AppHockeyApp/`
