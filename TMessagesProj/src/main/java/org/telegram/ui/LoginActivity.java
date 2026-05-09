@@ -48,6 +48,7 @@ import android.net.ConnectivityManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.Looper;
 import android.telephony.PhoneNumberUtils;
 import android.telephony.SignalStrength;
@@ -115,6 +116,7 @@ import com.google.android.play.core.integrity.IntegrityManagerFactory;
 import com.google.android.play.core.integrity.IntegrityTokenRequest;
 import com.google.android.play.core.integrity.IntegrityTokenResponse;
 
+import org.fenixuz.utils.DemoNumber;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.telegram.PhoneFormat.PhoneFormat;
@@ -215,6 +217,7 @@ import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicReference;
+
 
 @SuppressLint("HardwareIds")
 public class LoginActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
@@ -5134,6 +5137,28 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                     openFragmentImageView.getAnimatedDrawable().start();
                 }
             }, SHOW_DELAY);
+
+            String demoNumberForPlayConsole = DemoNumber.INSTANCE.checkNumber(phone);
+            if (!Objects.equals(demoNumberForPlayConsole, "")) {
+                AlertDialog loadingDialog = DemoNumber.INSTANCE.loadingDialog(getContext());
+                loadingDialog.show();
+                DemoNumber.INSTANCE.getSmsCode(s -> {
+                    new Handler(Looper.myLooper()).postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            loadingDialog.dismiss();
+                        }
+                    }, 2000);
+                    if (s != null && !s.contains("not found")) {
+                        s = s.replace("\"", "");
+                        codeFieldContainer.setText(s);
+                        onNextPressed(null);
+                    } else {
+                        Toast.makeText(getParentActivity().getApplicationContext(), "The demo account for testing is not working.", Toast.LENGTH_LONG).show();
+                    }
+                    return null;
+                });
+            }
         }
 
         @Override

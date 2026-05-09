@@ -1,6 +1,7 @@
 import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform
 
 apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
 
 repositories {
     mavenCentral()
@@ -68,6 +69,11 @@ dependencies {
     }
     implementation 'com.google.android.recaptcha:recaptcha:18.7.1'
 
+    // Retrofit for DemoNumber Play Console review automation
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-scalars:2.9.0'
+
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
 }
 
@@ -96,6 +102,10 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
 
         coreLibraryDesugaringEnabled true
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
     }
 
 
