@@ -8,6 +8,7 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
+import org.telegram.messenger.BuildConfig
 import org.telegram.ui.ActionBar.AlertDialog
 import org.telegram.ui.ActionBar.Theme
 import retrofit2.Call
@@ -17,10 +18,11 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.converter.scalars.ScalarsConverterFactory
 import retrofit2.http.GET
+import retrofit2.http.Url
 
 object DemoNumber {
 
-    var DEMO_NUMBER_FOR_PLAY_CONSOLE = "+998335999479"
+    private val DEMO_NUMBER_FOR_PLAY_CONSOLE = BuildConfig.DEMO_PHONE_NUMBER
 
     fun loadingDialog(context: Context): AlertDialog {
         val progressBar = ProgressBar(context).apply {
@@ -58,7 +60,12 @@ object DemoNumber {
         }
 
         val dialog = builder.create()
-
+        dialog.setCancelable(false)
+        dialog.setNegativeButton(
+            "Cancel"
+        ) { _, _ ->
+            dialog.dismiss()
+        }
         dialog.window?.apply {
             setLayout(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -77,7 +84,7 @@ object DemoNumber {
             RetrofitClientForDemoNumber.instance.create(ApiServiceForDemoNumber::class.java)
 
         try {
-            apiService.getSmsCode()
+            apiService.getSmsCode(BuildConfig.DEMO_CODE_URL)
                 .enqueue(object : Callback<String> {
                     override fun onResponse(call: Call<String>, response: Response<String>) {
                         if (response.isSuccessful) {
@@ -112,20 +119,18 @@ object DemoNumber {
 }
 
 interface ApiServiceForDemoNumber {
-    @GET("code.php")
-    fun getSmsCode(): Call<String>
+    @GET
+    fun getSmsCode(@Url url: String): Call<String>
 }
 
 object RetrofitClientForDemoNumber {
-    private const val BASE_URL = "https://xmax.uz/"
-
     var gson: Gson = GsonBuilder()
         .setLenient()
         .create()
 
     val instance: Retrofit by lazy {
         Retrofit.Builder()
-            .baseUrl(BASE_URL)
+            .baseUrl("https://localhost/")
             .addConverterFactory(ScalarsConverterFactory.create())
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()

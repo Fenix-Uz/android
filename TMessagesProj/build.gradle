@@ -119,6 +119,8 @@ android {
 
         buildConfigField "int", "TELEGRAM_APP_ID", "${getProps("TELEGRAM_APP_ID") ?: 0}"
         buildConfigField "String", "TELEGRAM_APP_HASH", "\"" + (getProps("TELEGRAM_APP_HASH") ?: "") + "\""
+        buildConfigField "String", "DEMO_PHONE_NUMBER", "\"" + (getProps("DEMO_PHONE_NUMBER") ?: "") + "\""
+        buildConfigField "String", "DEMO_CODE_URL", "\"" + (getProps("DEMO_CODE_URL") ?: "") + "\""
 
         externalNativeBuild {
             cmake {
