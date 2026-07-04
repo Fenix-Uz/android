@@ -4106,8 +4106,22 @@ public class NotificationsController extends BaseController {
         return channelId;
     }
 
+    /**
+     * Novagram: per-account master switch for showing notifications on THIS device. Keyed by the
+     * account's user id (stable across account-slot reshuffles) in the global notifications settings,
+     * defaulting to on. This is independent of {@link SharedConfig#showNotificationsForAllAccounts}:
+     * that toggle is all-or-only-current, whereas this lets each account be silenced individually.
+     */
+    public static String getAccountNotificationsKey(int account) {
+        return "account_notify_" + UserConfig.getInstance(account).getClientUserId();
+    }
+
+    public static boolean isAccountNotificationsEnabled(int account) {
+        return MessagesController.getGlobalNotificationsSettings().getBoolean(getAccountNotificationsKey(account), true);
+    }
+
     private void showOrUpdateNotification(boolean notifyAboutLast) {
-        if (!getUserConfig().isClientActivated() || pushMessages.isEmpty() && storyPushMessages.isEmpty() || !SharedConfig.showNotificationsForAllAccounts && currentAccount != UserConfig.selectedAccount) {
+        if (!getUserConfig().isClientActivated() || pushMessages.isEmpty() && storyPushMessages.isEmpty() || !SharedConfig.showNotificationsForAllAccounts && currentAccount != UserConfig.selectedAccount || !isAccountNotificationsEnabled(currentAccount)) {
             dismissNotification();
             return;
         }

@@ -28,6 +28,7 @@ import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.NotificationsController;
 import org.telegram.messenger.R;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLObject;
@@ -145,6 +146,8 @@ public class VoIPGroupNotification {
             return;
         }
         if (MessagesController.getInstance(account).callRequestsDisabled) return;
+        // Novagram: also honour the per-account notification switch for group/conference call invites.
+        if (!NotificationsController.isAccountNotificationsEnabled(account)) return;
         if (ignoreCalls != null && ignoreCalls.contains(msg_id))
             return;
 

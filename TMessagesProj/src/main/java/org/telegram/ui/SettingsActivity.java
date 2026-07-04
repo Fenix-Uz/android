@@ -82,6 +82,7 @@ import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
+import org.telegram.messenger.NotificationsController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.UserConfig;
@@ -118,6 +119,7 @@ import org.telegram.ui.Components.RecyclerListView;
 import org.telegram.ui.Components.ScaleStateListAnimator;
 import org.telegram.ui.Components.ShareAlert;
 import org.telegram.ui.Components.SizeNotifierFrameLayout;
+import org.telegram.ui.Components.Switch;
 import org.telegram.ui.Components.TextHelper;
 import org.telegram.ui.Components.UItem;
 import org.telegram.ui.Components.UniversalAdapter;
@@ -789,6 +791,21 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         }
         if (item.instanceOf(AccountCell.Factory.class)) {
             final int account = item.intValue;
+            // Novagram: tap on the right-side switch toggles this account's notifications (on this device);
+            // a tap anywhere else on the row still switches to that account.
+            if (view instanceof AccountCell && ((AccountCell) view).isOnSwitch(x)) {
+                final boolean enabled = !NotificationsController.isAccountNotificationsEnabled(account);
+                MessagesController.getGlobalNotificationsSettings().edit()
+                        .putBoolean(NotificationsController.getAccountNotificationsKey(account), enabled)
+                        .apply();
+                ((AccountCell) view).switchView.setChecked(enabled, true);
+                if (enabled) {
+                    NotificationsController.getInstance(account).showNotifications();
+                } else {
+                    NotificationsController.getInstance(account).hideNotifications();
+                }
+                return;
+            }
             if (LaunchActivity.instance != null) {
                 LaunchActivity.instance.switchToAccount(account, true);
             }
@@ -997,7 +1014,8 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         private BackupImageView avatarView;
         private SimpleTextView textView;
         private TextView counterView;
-        private ImageView arrowView;
+        // Novagram: per-account notification switch replaces the plain chevron on the right of each row.
+        public Switch switchView;
 
         private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable botDrawable;
         private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable emojiStatusDrawable;
@@ -1041,16 +1059,13 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             counterView.setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText, resourcesProvider));
             counterView.setBackground(Theme.createRoundRectDrawable(dp(10), Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider)));
 
-            arrowView = new ImageView(context);
-            arrowView.setImageResource(R.drawable.msg_arrowright);
-            arrowView.setScaleType(ImageView.ScaleType.CENTER);
-            arrowView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon, resourcesProvider), PorterDuff.Mode.SRC_IN));
+            switchView = new Switch(context, resourcesProvider);
+            switchView.setColors(Theme.key_switchTrack, Theme.key_switchTrackChecked, Theme.key_windowBackgroundWhite, Theme.key_windowBackgroundWhite);
 
             if (LocaleController.isRTL) {
                 textView.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
-                arrowView.setScaleX(-1);
 
-                addView(arrowView, LayoutHelper.createLinear(24, 24, 0, Gravity.CENTER_VERTICAL | Gravity.LEFT, 12, 0, 0, 0));
+                addView(switchView, LayoutHelper.createLinear(37, 20, 0, Gravity.CENTER_VERTICAL | Gravity.LEFT, 15, 0, 0, 0));
                 addView(counterView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 20, 0, Gravity.CENTER_VERTICAL, 0, 0, 0, 0));
                 addView(textView, LayoutHelper.createLinear(0, LayoutHelper.MATCH_PARENT, 1f, Gravity.FILL, 18, 0, 0, 0));
                 addView(avatarView, LayoutHelper.createLinear(28, 28, Gravity.CENTER_VERTICAL | Gravity.RIGHT, 18, 0, 18, 0));
@@ -1061,7 +1076,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 addView(avatarView, LayoutHelper.createLinear(28, 28, Gravity.CENTER_VERTICAL | Gravity.LEFT, 18, 0, 18, 0));
                 addView(textView, LayoutHelper.createLinear(0, LayoutHelper.MATCH_PARENT, 1f, Gravity.FILL, 0, 0, 18, 0));
                 addView(counterView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 20, 0, Gravity.CENTER_VERTICAL, 0, 0, 0, 0));
-                addView(arrowView, LayoutHelper.createLinear(24, 24, 0, Gravity.CENTER_VERTICAL | Gravity.RIGHT, 0, 0, 12, 0));
+                addView(switchView, LayoutHelper.createLinear(37, 20, 0, Gravity.CENTER_VERTICAL | Gravity.RIGHT, 0, 0, 15, 0));
             }
         }
 
@@ -1069,7 +1084,15 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         public void updateColors() {
             textView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider));
             counterView.setBackground(Theme.createRoundRectDrawable(dp(10), Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider)));
-            arrowView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon, resourcesProvider), PorterDuff.Mode.SRC_IN));
+        }
+
+        /**
+         * True if the tap landed on the notification switch (with a generous hit zone), so the caller
+         * toggles this account's notifications instead of switching to the account. Uses laid-out bounds,
+         * so it works for both LTR (switch on the right) and RTL (switch on the left).
+         */
+        public boolean isOnSwitch(float x) {
+            return x >= switchView.getLeft() - dp(10) && x <= switchView.getRight() + dp(10);
         }
 
         public void set(int account) {
@@ -1104,6 +1127,8 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             int counter = MessagesStorage.getInstance(account).getMainUnreadCount();
             counterView.setVisibility(counter > 0 ? View.VISIBLE : View.GONE);
             counterView.setText(LocaleController.formatNumber(counter, ','));
+
+            switchView.setChecked(NotificationsController.isAccountNotificationsEnabled(account), false);
         }
 
         @Override

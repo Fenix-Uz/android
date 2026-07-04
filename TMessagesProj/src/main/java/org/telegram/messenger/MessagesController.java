@@ -19550,6 +19550,16 @@ public class MessagesController extends BaseController implements NotificationCe
                                 }
                                 continue;
                             }
+                            // Novagram: honour the per-account notification switch for incoming calls too.
+                            // This is the single funnel for 1-on-1 incoming calls (both the SDK33+
+                            // pre-notification and the older VoIPService path branch off below this point),
+                            // so one gate here silences the call — no ring, no heads-up — for a muted account.
+                            if (!NotificationsController.isAccountNotificationsEnabled(currentAccount)) {
+                                if (BuildVars.LOGS_ENABLED) {
+                                    FileLog.d("Novagram: ignoring incoming call for account " + currentAccount + " — notifications are off for it");
+                                }
+                                continue;
+                            }
                             boolean notificationsDisabled = false;
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && !NotificationManagerCompat.from(ApplicationLoader.applicationContext).areNotificationsEnabled()) {
                                 notificationsDisabled = true;
