@@ -618,6 +618,13 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 if (qrLoginButtonView != null) {
                     marginLayoutParams = (MarginLayoutParams) qrLoginButtonView.getLayoutParams();
                     marginLayoutParams.topMargin = AndroidUtilities.dp(16) + statusBarHeight;
+                    // Novagram: the proxy button shares this top-right corner (32dp @ right-margin 16, so
+                    // its left edge sits 48dp from the right). In LTR that's exactly where the QR button is,
+                    // so when the proxy button is showing, slide the QR button to its left (48 + 8dp gap = 56)
+                    // instead of stacking them. In RTL the QR button lives on the LEFT edge, so no conflict.
+                    if (!LocaleController.isRTL) {
+                        marginLayoutParams.rightMargin = AndroidUtilities.dp(proxyButtonVisible ? 56 : 20);
+                    }
                 }
                 if (appTitle != null) {
                     marginLayoutParams = (MarginLayoutParams) appTitle.getLayoutParams();
@@ -816,6 +823,10 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
         proxyButtonView = new ImageView(context);
         proxyButtonView.setImageDrawable(proxyDrawable = new ProxyDrawable(context));
+        // The proxy shield otherwise fills the whole 32dp frame and dwarfs the smaller QR button beside
+        // it. Pad it in by 5.5dp so the shield draws at ~21dp — a touch larger than dead-even with the QR
+        // icon, which reads better — while the 32dp frame (and its ripple / touch target) stays put.
+        proxyButtonView.setPadding(AndroidUtilities.dp(5.5f), AndroidUtilities.dp(5.5f), AndroidUtilities.dp(5.5f), AndroidUtilities.dp(5.5f));
         proxyButtonView.setOnClickListener(v -> presentFragment(new ProxyListActivity()));
         proxyButtonView.setAlpha(0f);
         proxyButtonView.setVisibility(View.GONE);
