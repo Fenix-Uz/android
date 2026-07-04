@@ -20,19 +20,8 @@ import org.telegram.ui.Components.UItem
 import org.telegram.ui.Components.UniversalAdapter
 import org.telegram.ui.Components.UniversalFragment
 
-/**
- * Novagram: one per-chat "Novagram" screen that bundles the chat-level Novagram tools, opened from a single
- * 3-dot menu item so the chat menu stays uncluttered. Holds the per-chat USER tools:
- *  - One-time voice/video default (toggle)
- *  - Auto-add text (toggle + Edit)
- *  - Chat lock (button → passcode flow)
- *  - Chat ID (tap to copy)
- * Admin actions (join requests, join-all-accounts) and the global text-style picker stay in the 3-dot menu.
- *
- * [parentChat] lets the lock flow mark the host chat as "passed" this session, so locking from here doesn't
- * immediately gate the chat you're currently inside (mirrors the old in-menu lock handler).
- */
-class ChatFenixSettings(
+class
+ChatFenixSettings(
     private val dialogId: Long,
     private val parentChat: ChatActivity?
 ) : UniversalFragment() {
@@ -131,7 +120,6 @@ class ChatFenixSettings(
         }
     }
 
-    /** Replicates the old in-menu lock handler, but marks the host chat passed via [parentChat]. */
     private fun lockFlow() {
         parentChat?.markChatLockPassed()
         if (Password.isLocked(dialogId)) {
