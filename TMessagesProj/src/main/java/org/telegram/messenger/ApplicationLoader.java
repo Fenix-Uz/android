@@ -415,6 +415,9 @@ public class ApplicationLoader extends Application {
 
         LauncherIconController.tryFixLauncherIconIfNeeded();
         ProxyRotationController.init();
+        // Novagram: in censored regions (Russia), auto-attach a proxy before login so the user can
+        // even reach Telegram's servers. No-ops elsewhere and never overrides a user-set proxy.
+        org.fenixuz.proxy.RegionProxyManager.maybeAutoConnect();
     }
 
     public static void startPushService() {
