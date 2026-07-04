@@ -7720,6 +7720,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             int color1 = folderId != 0 ? getThemedColor(Theme.key_actionBarDefaultArchivedIcon) : getThemedColor(Theme.key_actionBarDefaultIcon);
             actionBar.setItemsColor(ColorUtils.blendARGB(color1, getThemedColor(Theme.key_actionBarActionModeDefaultIcon), searchAnimationProgress), false);
             actionBar.setItemsColor(ColorUtils.blendARGB(getThemedColor(Theme.key_actionBarActionModeDefaultIcon), getThemedColor(Theme.key_actionBarActionModeDefaultIcon), searchAnimationProgress), true);
+            // setItemsColor re-tints every menu icon (incl. Ghost) to the action-mode icon color, which turns
+            // the raw Ghost-on drawable black while the search bar animates. Re-assert the Ghost item's own
+            // coloring here (each frame) so it keeps its icon — colored when on, gray when off — throughout.
+            updateGhostButton();
 
             color1 = folderId != 0 ? getThemedColor(Theme.key_actionBarDefaultArchivedSelector) : getThemedColor(Theme.key_actionBarDefaultSelector);
             int color2 = getThemedColor(Theme.key_actionBarActionModeDefaultSelector);
