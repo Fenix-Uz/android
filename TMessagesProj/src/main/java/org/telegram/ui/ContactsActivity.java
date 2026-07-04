@@ -422,6 +422,9 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
             }
         };
         searchListViewAdapter.includeSearch = false;
+        // Novagram: keep the local contact search consistent with the source-filtered list — hide secret
+        // contacts from Contacts search too (flat-list pickers use their own adapters and stay complete).
+        searchListViewAdapter.hideSecretFolderContacts = true;
         int inviteViaLink;
         if (chatId != 0) {
             TLRPC.Chat chat = getMessagesController().getChat(chatId);
@@ -460,6 +463,8 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
         listViewAdapter.setSortType(sortItem != null ? (sortByName ? 1 : 2) : 0, false);
         listViewAdapter.setDisableSections(disableSections);
         listViewAdapter.includeSearch = false;
+        // Novagram: secret-folder contacts are hidden at the source (ContactsController builds the section
+        // arrays without them), so the list adapter itself needs no special flag here.
 
         fragmentView = contentView = new SizeNotifierFrameLayout(context) {
             @Override

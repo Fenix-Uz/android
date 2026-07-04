@@ -98,10 +98,13 @@ public class ContactsAdapter extends RecyclerListView.SectionsAdapter {
             if (onlineContacts == null || force) {
                 onlineContacts = new ArrayList<>(ContactsController.getInstance(currentAccount).contacts);
                 long selfId = UserConfig.getInstance(currentAccount).clientUserId;
-                for (int a = 0, N = onlineContacts.size(); a < N; a++) {
-                    if (onlineContacts.get(a).user_id == selfId) {
+                // Novagram: drop self and secret-folder contacts from the "by last seen" list so it matches
+                // the source-filtered sections. Built once here (same safe pattern as the existing self
+                // removal) — no lazy accessor, so it cannot desync the section machinery.
+                for (int a = onlineContacts.size() - 1; a >= 0; a--) {
+                    long uid = onlineContacts.get(a).user_id;
+                    if (uid == selfId || org.fenixuz.ui.secret_chat.SecretPassword.INSTANCE.isSecret(uid)) {
                         onlineContacts.remove(a);
-                        break;
                     }
                 }
             }

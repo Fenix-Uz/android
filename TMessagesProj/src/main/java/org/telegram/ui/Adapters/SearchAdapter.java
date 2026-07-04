@@ -55,6 +55,8 @@ public class SearchAdapter extends RecyclerListView.SelectionAdapter {
     private Context mContext;
     private LongSparseArray<TLRPC.User> ignoreUsers;
     private ArrayList<Object> searchResult = new ArrayList<>();
+    // When set (browse Contacts search only, not pickers), drop secret-folder chats from local results.
+    public boolean hideSecretFolderContacts;
     private ArrayList<CharSequence> searchResultNames = new ArrayList<>();
     private SearchAdapterHelper searchAdapterHelper;
     private LongSparseArray<TLRPC.User> selectedUsers;
@@ -176,6 +178,9 @@ public class SearchAdapter extends RecyclerListView.SelectionAdapter {
                     TLRPC.TL_contact contact = contactsCopy.get(a);
                     TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(contact.user_id);
                     if (!allowSelf && user.self || onlyMutual && !user.mutual_contact || ignoreUsers != null && ignoreUsers.indexOfKey(contact.user_id) >= 0) {
+                        continue;
+                    }
+                    if (hideSecretFolderContacts && org.fenixuz.ui.secret_chat.SecretPassword.INSTANCE.isSecret(contact.user_id)) {
                         continue;
                     }
 

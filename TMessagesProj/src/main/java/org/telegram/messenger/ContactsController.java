@@ -1661,6 +1661,13 @@ public class ContactsController extends BaseController {
                         contactsByPhonesShortDict.put(user.phone.substring(Math.max(0, user.phone.length() - 7)), value);
                     }
 
+                    // Novagram: keep secret-folder contacts out of the section arrays (regular + mutual) so
+                    // they never show in the Contacts list or section-based pickers. contactsDictionary and
+                    // the phone dictionaries above stay complete, so lookups and flat-list flows are intact.
+                    if (org.fenixuz.ui.secret_chat.SecretPassword.INSTANCE.isSecret(value.user_id)) {
+                        continue;
+                    }
+
                     String key = UserObject.getFirstName(user);
                     if (key.length() > 1) {
                         key = key.substring(0, 1);
@@ -1945,6 +1952,13 @@ public class ContactsController extends BaseController {
             if (user == null) {
                 continue;
             }
+            // Novagram: keep secret-folder contacts out of the sectioned Contacts list (and every view built
+            // from these sections). The flat `contacts` list stays complete, so group creation, forwarding
+            // and other flat-list flows are unaffected. Sections are rebuilt on secret changes via
+            // rebuildSecretFilteredSections().
+            if (org.fenixuz.ui.secret_chat.SecretPassword.INSTANCE.isSecret(value.user_id)) {
+                continue;
+            }
 
             String key = UserObject.getFirstName(user);
             if (key.length() > 1) {
@@ -1981,6 +1995,17 @@ public class ContactsController extends BaseController {
 
         usersSectionsDict = sectionsDict;
         sortedUsersSectionsArray = sortedSectionsArray;
+    }
+
+    // Novagram: rebuild the section arrays (which now exclude secret-folder contacts) and refresh any open
+    // Contacts UI. Call this right after a chat is added to / removed from the secret folder so the change
+    // is reflected immediately instead of only on the next contact sync. Runs on the main thread to stay
+    // consistent with the other UI-triggered rebuilds (e.g. contact deletion).
+    public void rebuildSecretFilteredSections() {
+        AndroidUtilities.runOnUIThread(() -> {
+            buildContactsSectionsArrays(false);
+            getNotificationCenter().postNotificationName(NotificationCenter.contactsDidLoad);
+        });
     }
 
     public static boolean hasContactsPermission() {

@@ -5,6 +5,7 @@ import com.google.gson.Gson
 import org.fenixuz.ui.lock.LockCredential
 import org.fenixuz.ui.lock.LockEditor
 import org.telegram.messenger.ApplicationLoader
+import org.telegram.messenger.ContactsController
 import org.telegram.messenger.MessagesController
 import org.telegram.messenger.UserConfig
 
@@ -104,6 +105,10 @@ object SecretPassword {
     private fun persist() {
         secretIdsArray = secretIds.toLongArray()
         sharedPreferences.edit().putString(SECRET_IDS_LOCATE, gson.toJson(secretIdsArray)).apply()
+        // Novagram: a chat just moved into / out of the secret folder — rebuild the account's Contacts
+        // sections (which now skip secret contacts) so the change shows immediately, not only on next sync.
+        // Posted to the main thread by the controller, so calling it from these synchronized methods is safe.
+        ContactsController.getInstance(UserConfig.selectedAccount).rebuildSecretFilteredSections()
     }
 
     fun isSecret(dialogId: Long): Boolean = secretIdsArray.contains(dialogId)
