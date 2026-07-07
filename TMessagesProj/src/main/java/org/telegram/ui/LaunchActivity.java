@@ -1524,6 +1524,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         int push_enc_id = 0;
         int push_msg_id = 0;
         int open_settings = 0;
+        String open_novagram_settings_url = null;
         int open_widget_edit = -1;
         int open_widget_edit_type = -1;
         int open_new_dialog = 0;
@@ -2544,6 +2545,8 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                                         url = url.replace("tg:addtheme", "tg://telegram.org").replace("tg://addtheme", "tg://telegram.org");
                                         data = Uri.parse(url);
                                         theme = data.getQueryParameter("slug");
+                                    } else if (url.startsWith("tg:novagram_settings") || url.startsWith("tg://novagram_settings")) {
+                                        open_novagram_settings_url = url;
                                     } else if (url.startsWith("tg:settings") || url.startsWith("tg://settings")) {
                                         if (url.contains("themes") || url.contains("theme")) {
                                             open_settings = 2;
@@ -3126,6 +3129,10 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                     actionBarLayout.rebuildFragments(INavigationLayout.REBUILD_FLAG_REBUILD_LAST);
                     rightActionBarLayout.rebuildFragments(INavigationLayout.REBUILD_FLAG_REBUILD_LAST);
                 }
+                pushOpened = true;
+            } else if (open_novagram_settings_url != null) {
+                final String novaSettingsUrl = open_novagram_settings_url;
+                AndroidUtilities.runOnUIThread(() -> presentFragment(new org.fenixuz.ui.FenixSettings(novaSettingsUrl)));
                 pushOpened = true;
             } else if (open_new_dialog != 0) {
                 Bundle args = new Bundle();

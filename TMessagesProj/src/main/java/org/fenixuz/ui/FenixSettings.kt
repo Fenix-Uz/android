@@ -4,6 +4,11 @@ import android.content.Context
 import android.media.RingtoneManager
 import android.view.View
 import android.widget.FrameLayout
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
+import android.graphics.drawable.ColorDrawable
+import org.telegram.ui.ActionBar.Theme
 import org.fenixuz.ui.auto_answer.AutoAnswer
 import org.fenixuz.ui.auto_answer.AutoAnswerMenu
 import org.fenixuz.ui.create_folder_dialog.FolderIcons
@@ -38,6 +43,9 @@ import org.telegram.ui.Components.NumberPicker
 import org.telegram.ui.Components.UItem
 import org.telegram.ui.Components.UniversalAdapter
 import org.telegram.ui.Components.UniversalFragment
+import org.telegram.ui.Components.ShareAlert
+import org.telegram.ui.Components.BulletinFactory
+import org.telegram.messenger.MessageObject
 
 /**
  * Fenix Settings — Novagram feature hub, rendered in native Telegram style
@@ -48,7 +56,7 @@ import org.telegram.ui.Components.UniversalFragment
  *  - hide the stories tray in the chat list ([StoryUtil], hooked in StoriesController)
  * Add one row per ported feature.
  */
-class FenixSettings : UniversalFragment() {
+class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = null) : UniversalFragment() {
 
     private val STORY_GHOST = 1
     private val STORY_HIDE = 2
@@ -80,6 +88,33 @@ class FenixSettings : UniversalFragment() {
     // Onboarding: a toolbar "?" replays the full feature tour; the short tour auto-runs once on first open.
     private val HELP_BUTTON = 1001
     private val TOUR_SHOWN_KEY = "fenix_tour_shown"
+
+    // Shareable settings deep-links: long-press a row to copy/send a tg://novagram_settings/<key> link;
+    // opening that link (handled in LaunchActivity) reopens this screen scrolled to + highlighting the row.
+    // Only feature rows are linkable; action/sub-picker rows (inbox, pickers, passcode) are intentionally left out.
+    private val LINK_SCHEME = "tg://novagram_settings"
+    private val linkKeys: Map<Int, String> = linkedMapOf(
+        STORY_GHOST to "story_ghost",
+        STORY_HIDE to "hide_stories",
+        STORY_DOWNLOAD to "story_download",
+        EDIT_SAVE to "save_edited_messages",
+        DELETE_SAVE to "save_deleted_messages",
+        DOWNLOAD_STOP to "stop_automatic_downloads",
+        AUTO_ANSWER_ACTIVE to "auto_answer",
+        GHOST_MODE to "ghost",
+        GHOST_ACTIONBAR_BTN to "ghost_button",
+        SECRET_CHAT to "secret_chat",
+        CONFIRM_STICKER to "confirm_sticker",
+        CONFIRM_VOICE to "confirm_voice",
+        CONFIRM_GIF to "confirm_gif",
+        FOLDER_ICONS to "folder_icons",
+        HIDE_TABS to "hide_tabs",
+        AUTO_ACCEPT_JOIN to "auto_accept_join",
+        REMINDER_ENABLED to "reminder",
+        STRANGER_SHIELD to "protection_from_strangers"
+    )
+    private var targetConsumed = false
+    private var flashAnimator: ValueAnimator? = null
 
     /** True when auto-download is fully stopped (all network presets disabled). */
     private fun isAutoDownloadStopped(): Boolean {
@@ -315,6 +350,8 @@ class FenixSettings : UniversalFragment() {
             items.add(UItem.asButton(STRANGER_INBOX, LanguageCode.getMyTitles(321)))
         }
         items.add(UItem.asShadow(null))
+
+        resolveTargetPosition(items)
     }
 
     private fun reminderDelayLabel(): String =
@@ -506,6 +543,102 @@ class FenixSettings : UniversalFragment() {
     }
 
     override fun onLongClick(item: UItem, view: View, position: Int, x: Float, y: Float): Boolean {
-        return false
+        // Long-press a linkable row → offer to copy or send its deep-link.
+        val key = linkKeys[item.id] ?: return false
+        val ctx = parentActivity ?: return false
+        val url = "$LINK_SCHEME/$key"
+        AlertDialog.Builder(ctx)
+            .setItems(
+                arrayOf<CharSequence>(LanguageCode.getMyTitles(351), LanguageCode.getMyTitles(352))
+            ) { _, which ->
+                if (which == 0) {
+                    AndroidUtilities.addToClipboard(url)
+                    BulletinFactory.of(this).createCopyLinkBulletin().show()
+                } else {
+                    showDialog(ShareAlert(ctx, null as ArrayList<MessageObject>?, url, false, url, false))
+                }
+            }
+            .show()
+        return true
+    }
+
+    /**
+     * Resolve the deep-linked row (tg://novagram_settings/<key>) and — once — scroll to + flash-highlight it.
+     * Mirrors Telegram's own working pattern (LiteModeSettingsActivity.highlightRow): the scroll lives INSIDE
+     * the highlight callback, so if the row isn't laid out yet the highlight is deferred and the callback
+     * re-runs (re-scrolling) when the row appears. Doing the scroll outside would skip that self-healing.
+     */
+    private fun resolveTargetPosition(items: ArrayList<UItem>) {
+        if (targetUrl == null || targetConsumed) return
+        val key = targetUrl.substringAfterLast('/').substringBefore('?')
+        val targetId = linkKeys.entries.firstOrNull { it.value == key }?.key
+        if (targetId == null) {
+            targetConsumed = true
+            return
+        }
+        val pos = items.indexOfFirst { it.id == targetId }
+        if (pos < 0) {
+            targetConsumed = true
+            return
+        }
+        targetConsumed = true
+        // Let the list finish its first layout pass, then scroll to + flash the row.
+        AndroidUtilities.runOnUIThread({ scrollAndFlash(pos, 0) }, 250)
+    }
+
+    /** Scroll the deep-linked row into view, then flash it. Retries a few times until the row is laid out. */
+    private fun scrollAndFlash(pos: Int, attempt: Int) {
+        try {
+            listView.layoutManager.scrollToPositionWithOffset(pos, AndroidUtilities.dp(80f))
+        } catch (ignore: Exception) {
+        }
+        AndroidUtilities.runOnUIThread({
+            val row = listView.findViewHolderForAdapterPosition(pos)?.itemView
+            if (row != null && row.width > 0 && row.height > 0) {
+                flashRow(row, pos)
+            } else if (attempt < 4) {
+                scrollAndFlash(pos, attempt + 1)
+            }
+        }, 140)
+    }
+
+    /**
+     * The card-style section list doesn't paint the native row selector, so highlightRow is invisible here.
+     * Instead, draw a fading accent overlay on top of the row (double blink) — clearly visible in both themes,
+     * without touching the row's real background.
+     */
+    private fun flashRow(row: View, pos: Int) {
+        flashAnimator?.cancel()
+        val overlay = ColorDrawable(Theme.getColor(Theme.key_featuredStickers_addButton))
+        overlay.setBounds(0, 0, row.width, row.height)
+        overlay.alpha = 0
+        row.overlay.add(overlay)
+        // Three clear blinks over ~2.1s so it's easy to spot which row the link points to.
+        val anim = ValueAnimator.ofInt(0, 95, 0, 95, 0, 95, 0)
+        anim.duration = 2100
+        anim.addUpdateListener {
+            // Guard: if the row got recycled/detached (e.g. the user scrolled during the flash), stop —
+            // so the blink can never land on the wrong row. onAnimationEnd (fired on cancel too) cleans up.
+            if (row.parent == null || listView.getChildAdapterPosition(row) != pos) {
+                it.cancel()
+                return@addUpdateListener
+            }
+            overlay.alpha = it.animatedValue as Int
+            row.invalidate()
+        }
+        anim.addListener(object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: Animator) {
+                row.overlay.remove(overlay)
+                if (flashAnimator === anim) flashAnimator = null
+            }
+        })
+        flashAnimator = anim
+        anim.start()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Don't let a flash keep running (touching views) after we leave the screen.
+        flashAnimator?.cancel()
     }
 }

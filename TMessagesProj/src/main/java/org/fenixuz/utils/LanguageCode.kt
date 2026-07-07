@@ -1715,6 +1715,8 @@ object LanguageCode {
         titlesLanguages.add(TitleLanguages(348, "Media editing", "Media tahrirlash", "Редактирование медиа"))
         titlesLanguages.add(TitleLanguages(349, "Tools", "Vositalar", "Инструменты"))
         titlesLanguages.add(TitleLanguages(350, "Useful & fun", "Foydali va ko'ngil ochar", "Полезное и развлечения"))
+        titlesLanguages.add(TitleLanguages(351, "Copy link", "Havolani nusxalash", "Скопировать ссылку"))
+        titlesLanguages.add(TitleLanguages(352, "Send link", "Havolani jo'natish", "Отправить ссылку"))
     }
 
     init {
