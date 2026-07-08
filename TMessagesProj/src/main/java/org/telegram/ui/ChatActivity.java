@@ -1624,6 +1624,7 @@ public class ChatActivity extends BaseFragment implements
     private final static int fenix_settings = 1003;
     private final static int voice_input = 1004;
     private final static int auto_translate = 1005;
+    private final static int special_forward = 1006; // fenixuz: hide-sender forward for multi-selected messages
     private final static int scheduled = 63;
     private final static int edit_quick_reply = 64;
 
@@ -3842,7 +3843,10 @@ public class ChatActivity extends BaseFragment implements
                     }
                     createDeleteMessagesAlert(null, null);
                 } else if (id == forward) {
-                    openForward(true);
+                    openForward(true, false);
+                } else if (id == special_forward) {
+                    // fenixuz: forward the selected messages without the original sender's name.
+                    openForward(true, true);
                 } else if (id == share) {
                     share();
                 } else if (id == open_direct) {
@@ -8140,7 +8144,7 @@ public class ChatActivity extends BaseFragment implements
         }
 
         actionsButtonsLayout = new ChatActivityActionsButtonsLayout(context, resourceProvider, blurredBackgroundColorProvider, glassBackgroundDrawableFactory);
-        actionsButtonsLayout.setForwardButtonOnClickListener(v -> openForward(false));
+        actionsButtonsLayout.setForwardButtonOnClickListener(v -> openForward(false, false));
         actionsButtonsLayout.setReplyButtonOnClickListener(v -> {
             MessageObject messageObject = null;
             for (int a = 1; a >= 0; a--) {
@@ -10351,6 +10355,9 @@ public class ChatActivity extends BaseFragment implements
             actionModeViews.add(actionMode.addItemWithWidth(star, R.drawable.msg_fave, AndroidUtilities.dp(54), LocaleController.getString(R.string.AddToFavorites)));
             actionModeViews.add(actionMode.addItemWithWidth(copy, R.drawable.msg_copy, AndroidUtilities.dp(54), LocaleController.getString(R.string.Copy)));
             if (!isSavedMessages && getDialogId() != UserObject.VERIFY) {
+                // fenixuz: "Special forward" — one-tap hide-sender forward for the selected messages.
+                // Added before the normal Forward so it renders to its right (Forward first, Special second).
+                actionModeViews.add(actionMode.addItemWithWidth(special_forward, R.drawable.msg_share, AndroidUtilities.dp(54), org.fenixuz.utils.LanguageCode.INSTANCE.getMyTitles(255)));
                 actionModeViews.add(actionMode.addItemWithWidth(forward, R.drawable.msg_forward, AndroidUtilities.dp(54), LocaleController.getString(R.string.Forward)));
             }
             actionModeViews.add(actionMode.addItemWithWidth(share, R.drawable.msg_shareout, AndroidUtilities.dp(54), LocaleController.getString(R.string.ShareFile)));
@@ -12264,7 +12271,20 @@ public class ChatActivity extends BaseFragment implements
         updateSelectedMessageReactions();
     }
 
-    private void openForward(boolean fromActionBar) {
+    // fenixuz: set/clear the one-shot hide-sender flag on every currently selected message.
+    // Used by "Special forward" (true) and normal forward (false, to drop any stale flag).
+    private void setSpecialForwardFlagOnSelected(boolean value) {
+        for (int a = 0; a < 2; a++) {
+            for (int b = 0; b < selectedMessagesIds[a].size(); b++) {
+                MessageObject msg = selectedMessagesIds[a].valueAt(b);
+                if (msg != null) {
+                    msg.hideSpetialFunction = value;
+                }
+            }
+        }
+    }
+
+    private void openForward(boolean fromActionBar, boolean specialForward) {
         if (isPeerNoForwards() || hasSelectedNoforwardsMessage()) {
             // We should update text if user changed locale without re-opening chat activity
             String str;
@@ -12335,6 +12355,9 @@ public class ChatActivity extends BaseFragment implements
         if (selectionReactionsOverlay != null && selectionReactionsOverlay.isVisible()) {
             selectionReactionsOverlay.setHiddenByScroll(true);
         }
+        // fenixuz: apply (special) or clear (normal) the one-shot hide-sender flag for every openForward
+        // entry point — top-bar Forward, top-bar Special forward, and the bottom forward button.
+        setSpecialForwardFlagOnSelected(specialForward);
         Bundle args = new Bundle();
         args.putBoolean("onlySelect", true);
         args.putInt("dialogsType", DialogsActivity.DIALOGS_TYPE_FORWARD);
@@ -19170,6 +19193,7 @@ public class ChatActivity extends BaseFragment implements
                 ActionBarMenuItem deleteItem = actionBar.createActionMode().getItem(delete);
                 ActionBarMenuItem tagItem = actionBar.createActionMode().getItem(tag_message);
                 ActionBarMenuItem shareItem = actionBar.createActionMode().getItem(share);
+                ActionBarMenuItem specialForwardItem = actionBar.createActionMode().getItem(special_forward); // fenixuz
 
                 boolean noforwards = isPeerNoForwards() || hasSelectedNoforwardsMessage();
                 if (prevCantForwardCount == 0 && cantForwardMessagesCount != 0 || prevCantForwardCount != 0 && cantForwardMessagesCount == 0) {
@@ -19209,6 +19233,11 @@ public class ChatActivity extends BaseFragment implements
                     if (actionsButtonsLayout != null) {
                         actionsButtonsLayout.setForwardButtonEnabled(cantForwardMessagesCount == 0 || noforwards, false);
                     }
+                }
+                // fenixuz: keep "Special forward" in lockstep with the normal forward button.
+                if (specialForwardItem != null) {
+                    specialForwardItem.setEnabled(cantForwardMessagesCount == 0 || noforwards);
+                    specialForwardItem.setAlpha(cantForwardMessagesCount == 0 ? 1.0f : 0.5f);
                 }
                 if (saveItem != null) {
                     saveItem.setVisibility(((canSaveMusicCount > 0 && canSaveDocumentsCount == 0) || (canSaveMusicCount == 0 && canSaveDocumentsCount > 0)) && cantSaveMessagesCount == 0 ? View.VISIBLE : View.GONE);
@@ -32760,6 +32789,13 @@ public class ChatActivity extends BaseFragment implements
                 }
                 forwardingMessage = selectedObject;
                 forwardingMessageGroup = selectedObjectGroup;
+                // fenixuz: a normal forward must never inherit a stale special-forward flag.
+                forwardingMessage.hideSpetialFunction = false;
+                if (forwardingMessageGroup != null) {
+                    for (int fi = 0; fi < forwardingMessageGroup.messages.size(); fi++) {
+                        forwardingMessageGroup.messages.get(fi).hideSpetialFunction = false;
+                    }
+                }
                 Bundle args = new Bundle();
                 args.putBoolean("onlySelect", true);
                 args.putInt("dialogsType", DialogsActivity.DIALOGS_TYPE_FORWARD);
@@ -33735,6 +33771,17 @@ public class ChatActivity extends BaseFragment implements
                 }
             }
         }
+        // fenixuz: "Special forward" — hide the original sender if any forwarded message carries the flag.
+        // Path B (opening the target chat) consumes the flag later at send time; the direct-send path
+        // below (multiple targets / Saved Messages / scheduled) needs it applied and cleared here.
+        boolean fenixHideSenderTmp = false;
+        for (int i = 0; i < fmessages.size(); i++) {
+            if (fmessages.get(i).hideSpetialFunction) {
+                fenixHideSenderTmp = true;
+                break;
+            }
+        }
+        final boolean fenixHideSender = fenixHideSenderTmp;
         for (int j = 0; j < dids.size(); j++) {
             TLRPC.Chat chat = getMessagesController().getChat(-dids.get(j).dialogId);
             if (chat != null) {
@@ -33782,7 +33829,11 @@ public class ChatActivity extends BaseFragment implements
                         params.suggestionParams = messageSuggestionParams;
                         getSendMessagesHelper().sendMessage(params);
                     }
-                    getSendMessagesHelper().sendMessage(fmessages, did, false, false, notify, scheduleDate, scheduleRepeatPeriod, null, -1, price == null ? 0 : price, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
+                    getSendMessagesHelper().sendMessage(fmessages, did, fenixHideSender, false, notify, scheduleDate, scheduleRepeatPeriod, null, -1, price == null ? 0 : price, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
+                }
+                // fenixuz: this path sends immediately, so clear the one-shot flag now to avoid leaking into later forwards.
+                for (int i = 0; i < fmessages.size(); i++) {
+                    fmessages.get(i).hideSpetialFunction = false;
                 }
                 fragment.finishFragment();
                 createUndoView();
