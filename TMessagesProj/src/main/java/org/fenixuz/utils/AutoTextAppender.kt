@@ -132,7 +132,10 @@ object AutoTextAppender {
         return try {
             var m: CharSequence = SpannableStringBuilder(text)
             m = Emoji.replaceEmoji(m, fontMetrics, false)
-            MessageObject.addEntitiesToText(m, entities, true, false, true, false)
+            // out=false, photoViewer=false → mono/code runs render with key_chat_messageTextIn (theme-aware,
+            // dark in light mode / light in dark mode). The old photoViewer=true forced type 2 = pure white
+            // (URLSpanMono/CodeHighlighting), which is invisible on the light editor/composer background.
+            MessageObject.addEntitiesToText(m, entities, false, false, false, false)
             m = MessageObject.replaceAnimatedEmoji(m, entities, fontMetrics)
             m
         } catch (e: Exception) {
