@@ -76,6 +76,35 @@ public final class NovaPromoChannel {
         return s != null && s.injected && s.dialog != null && s.dialog.id == dialogId;
     }
 
+    /**
+     * Called from {@link MessagesController#deleteDialog} when a dialog is removed. If it is our promo
+     * channel, the user just left it — but a plain channel leave does NOT flip the in-memory
+     * {@code chat.left} flag (only Telegram's own promo does), so {@code evaluate()} would keep treating
+     * the user as a member and never re-show the row until a cold restart reloads the chat as left.
+     * We mirror what Telegram does for its promo: mark the chat left, then reconcile so the row comes back.
+     *
+     * <p>The reconcile is deferred to the next UI-loop tick because at the dialogDeleted call site the
+     * real dialog has not been pulled out of the model yet; running after the deletion completes lets
+     * {@code evaluate()} see the absent dialog and re-inject. UI thread.
+     */
+    public static void onDialogDeleted(int account, long dialogId) {
+        State s = STATES.get(account);
+        if (s == null || s.channelId == 0 || dialogId != -s.channelId) {
+            return;
+        }
+        AndroidUtilities.runOnUIThread(() -> {
+            State st = STATES.get(account);
+            if (st == null || st.channelId == 0 || -st.channelId != dialogId) {
+                return;
+            }
+            TLRPC.Chat chat = MessagesController.getInstance(account).getChat(st.channelId);
+            if (chat != null) {
+                chat.left = true;
+            }
+            reconcile(account);
+        });
+    }
+
     /** Sets up / refreshes the promo for an account. Safe to call often (throttled). UI thread. */
     public static void reconcile(int account) {
         if (rcLoaded) {

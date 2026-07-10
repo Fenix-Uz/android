@@ -9746,6 +9746,8 @@ public class MessagesController extends BaseController implements NotificationCe
                 getNotificationCenter().postNotificationName(NotificationCenter.dialogDeleted, did, 0);
                 getNotificationsController().deleteNotificationChannel(did, 0);
                 JoinCallAlert.processDeletedChat(currentAccount, did);
+                // Novagram: if the user just left our promo channel, bring the promo row back.
+                org.fenixuz.channel.NovaPromoChannel.onDialogDeleted(currentAccount, did);
             }
             if (onlyHistory == 0) {
                 getMediaDataController().cleanDraft(did, 0, false);
