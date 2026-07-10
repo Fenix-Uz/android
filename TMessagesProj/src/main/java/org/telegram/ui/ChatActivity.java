@@ -6203,7 +6203,12 @@ public class ChatActivity extends BaseFragment implements
                     ImageReceiver imageReceiver = cell.getAvatarImage();
                     if (imageReceiver != null && getSideMenuAlpha() < 1.f) {
                         MessageObject.GroupedMessages groupedMessages = getValidGroupedMessage(message);
-                        boolean updateVisibility = !cell.getMessageObject().deleted && chatListView.getChildAdapterPosition(cell) != RecyclerView.NO_POSITION;
+                        // Fenix delete-save: a kept (server-deleted but saved) message stays in the list with
+                        // deleted==true, but this gate treats deleted messages as animating-out and stops
+                        // repositioning their floating avatar on scroll, so it detaches from the message.
+                        // Kept messages are permanent, so keep updating their avatar like a normal message.
+                        boolean fenixKeptDeleted = cell.getMessageObject().deletedBy != null && !cell.getMessageObject().deletedBy.isEmpty();
+                        boolean updateVisibility = (!cell.getMessageObject().deleted || fenixKeptDeleted) && chatListView.getChildAdapterPosition(cell) != RecyclerView.NO_POSITION;
 
                         boolean replaceAnimation = chatListView.isFastScrollAnimationRunning() || (groupedMessages != null && groupedMessages.transitionParams.backgroundChangeBounds);
                         int top = (replaceAnimation ? child.getTop() : (int) child.getY()) + child.getPaddingTop();
