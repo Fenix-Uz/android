@@ -133,6 +133,9 @@ android {
         buildConfigField "String", "TELEGRAM_APP_HASH", "\"" + (getProps("TELEGRAM_APP_HASH") ?: "") + "\""
         buildConfigField "String", "DEMO_PHONE_NUMBER", "\"" + (getProps("DEMO_PHONE_NUMBER") ?: "") + "\""
         buildConfigField "String", "DEMO_CODE_URL", "\"" + (getProps("DEMO_CODE_URL") ?: "") + "\""
+        // Novagram: ads backend base URL — kept out of the public repo (read from local.properties).
+        // Empty when unset → the ads feature disables itself gracefully (see org.fenixuz.ads.AdsRetrofitClient).
+        buildConfigField "String", "ADS_BASE_URL", "\"" + (getProps("ADS_BASE_URL") ?: "") + "\""
 
         externalNativeBuild {
             cmake {

@@ -139,6 +139,13 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
     private String sponsoredQuery;
     private int sponsoredReqId;
     private int lastForumReqId;
+    // Novagram: our own sponsored channel (ads backend), shown as a single row at the very top of the
+    // search results. Rendered exactly like a normal chat result; kept entirely separate from Telegram's
+    // native sponsoredPeers so both can appear. See org.fenixuz.ads.AdsManager.
+    private TLRPC.Chat adChat;
+    private String adQuery;
+    // Label drawn in the ad pill on our sponsored row (Telegram-style ad disclosure).
+    private static final String AD_LABEL = "ads by Novagram";
     public DialogsSearchAdapterDelegate delegate;
     private int needMessagesSearch;
     private boolean messagesSearchEndReached;
@@ -1168,6 +1175,24 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                 }));
             }
         }
+        // Novagram: look up our sponsored channel (ads backend) for this query — mirrors the sponsoredQuery
+        // flow above but shows a single row at the very top of results. Main search only; AdsManager
+        // debounces + drops stale responses internally, so calling per keystroke is cheap.
+        if (dialogsType == DialogsActivity.DIALOGS_TYPE_DEFAULT && !TextUtils.equals(adQuery, query)) {
+            final String adQ = query;
+            adQuery = adQ;
+            adChat = null;
+            org.fenixuz.ads.AdsManager.INSTANCE.requestAd(adQ, (channelId) -> {
+                AndroidUtilities.runOnUIThread(() -> {
+                    if (!TextUtils.equals(adQuery, adQ)) {
+                        return;
+                    }
+                    adChat = channelId != null ? MessagesController.getInstance(currentAccount).getChat(channelId) : null;
+                    notifyDataSetChanged();
+                });
+                return kotlin.Unit.INSTANCE;
+            });
+        }
         if (TextUtils.isEmpty(query)) {
             filteredRecentQuery = null;
             searchAdapterHelper.unloadRecentHashtags();
@@ -1369,12 +1394,46 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
         return recent != null ? recent.size() : 0;
     }
 
+    // Novagram: the sponsored ad row is shown only in the main dialog search (not pickers), while
+    // actively searching (not the recent screen or hashtag mode), and only once its channel resolved.
+    // Every position walk below adds the exact same "if (showAd()) { if (i == 0) <ad>; i--; }" shim at
+    // its head, so the row occupies adapter position 0 and shifts everything else by one consistently.
+    private boolean showAd() {
+        return adChat != null && searchWas && searchResultHashtags.isEmpty()
+                && dialogsType == DialogsActivity.DIALOGS_TYPE_DEFAULT
+                && !adAlreadyShownElsewhere();
+    }
+
+    // Novagram: only suppress our ad row when Telegram is ALREADY showing the same channel as one of its
+    // OWN native sponsored peers — so we never stack two ad rows for one channel. We intentionally do NOT
+    // dedup against organic results: an advertiser tags with their own name (e.g. "kunuz"), which makes
+    // Telegram's global search surface that channel organically; suppressing on that hid the ad for its
+    // most important keywords. A sponsored slot at the top alongside an organic row below is expected ad
+    // behaviour (the row carries the "ads by Novagram" label), so we keep the ad visible.
+    private boolean adAlreadyShownElsewhere() {
+        final TLRPC.Chat ad = adChat;
+        if (ad == null) {
+            return false;
+        }
+        final long id = ad.id;
+        for (int i = 0; i < sponsoredPeers.size(); i++) {
+            TLRPC.TL_sponsoredPeer sp = sponsoredPeers.get(i);
+            if (sp != null && sp.peer != null && DialogObject.getPeerDialogId(sp.peer) == -id) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     public int getItemCount() {
         if (waitingResponseCount == 3) {
             return 0;
         }
         int count = 0;
+        if (showAd()) {
+            count++;
+        }
         if (!publicPosts.isEmpty()) {
             count += publicPosts.size() + 1;
         }
@@ -1442,6 +1501,12 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
     }
 
     public Object getItem(int i) {
+        if (showAd()) {
+            if (i == 0) {
+                return adChat;
+            }
+            i--;
+        }
         if (!publicPosts.isEmpty()) {
             if (i > 0 && i - 1 < publicPosts.size()) {
                 return publicPosts.get(i - 1);
@@ -1547,6 +1612,12 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
     public boolean isGlobalSearch(int i) {
         if (!searchWas) {
             return false;
+        }
+        if (showAd()) {
+            if (i == 0) {
+                return false;
+            }
+            i--;
         }
         if (!searchResultHashtags.isEmpty()) {
             return false;
@@ -1747,6 +1818,8 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                 ProfileSearchCell cell = (ProfileSearchCell) holder.itemView;
                 cell.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
                 long oldDialogId = cell.getDialogId();
+                // Novagram: is this the sponsored ad row? (captured before the section walk shifts position)
+                final boolean isOurAd = showAd() && position == 0;
 
                 TLRPC.User user = null;
                 TLRPC.Chat chat = null;
@@ -1792,6 +1865,12 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                     user = MessagesController.getInstance(currentAccount).getUser(encryptedChat.user_id);
                 }
 
+                // Novagram: consume the ad row's leading slot. For the ad itself (position 0) this makes
+                // position negative, which every guard below treats as "not in this section" (no crash);
+                // for real rows it removes the +1 offset so the section walk stays correct.
+                if (showAd()) {
+                    position--;
+                }
                 if (!publicPosts.isEmpty()) {
                     position -= publicPosts.size() + 1;
                 }
@@ -1945,6 +2024,7 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                 cell.allowBotOpenButton(isRecent, this::openBotApp);
                 cell.setOnSponsoredOptionsClick(this::openSponsoredOptions);
                 cell.setAd(obj instanceof TLRPC.TL_sponsoredPeer ? (TLRPC.TL_sponsoredPeer) obj : null);
+                cell.setCustomAd(isOurAd ? AD_LABEL : null);
                 cell.setData(user != null ? user : chat, encryptedChat, name, username, true, savedMessages);
                 cell.setChecked(delegate.isSelected(cell.getDialogId()), oldDialogId == cell.getDialogId());
                 break;
@@ -1959,6 +2039,11 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                     });
                 } else {
                     int rawPosition = position;
+                    // Novagram: keep rawPosition in true adapter coordinates (it drives notify* / animation
+                    // math below); only the section-content walk gets the ad offset removed.
+                    if (showAd()) {
+                        position--;
+                    }
                     if (!publicPosts.isEmpty()) {
                         if (position == 0) {
                             cell.setText(LocaleController.getString(R.string.PublicPostsTabs), AndroidUtilities.replaceArrows(LocaleController.getString(R.string.PublicPostsMore), false, dp(-2), dp(1)), v -> {
@@ -2214,6 +2299,12 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
 
     @Override
     public int getItemViewType(int i) {
+        if (showAd()) {
+            if (i == 0) {
+                return VIEW_TYPE_PROFILE_CELL;
+            }
+            i--;
+        }
         if (!searchResultHashtags.isEmpty()) {
             return i == 0 ? VIEW_TYPE_GRAY_SECTION : VIEW_TYPE_HASHTAG_CELL;
         }

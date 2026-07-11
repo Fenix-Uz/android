@@ -80,6 +80,9 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
     private CharSequence subLabel;
     private Theme.ResourcesProvider resourcesProvider;
     private TLRPC.TL_sponsoredPeer ad;
+    // Novagram: our own sponsored label (e.g. shown on the ads promo channel row). Reuses the exact
+    // same pill as Telegram's native ad label, but carries our text and has no options ("i") menu.
+    private CharSequence customAdLabel;
 
     private TLRPC.User user;
     private TLRPC.Chat chat;
@@ -201,7 +204,24 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
     }
 
     public void setAd(TLRPC.TL_sponsoredPeer sponsoredPeer) {
+        // Rebuild the pill text if the source changed — cells are recycled and the label text differs
+        // between a native sponsored peer and our custom label.
+        if (ad != sponsoredPeer) {
+            adText = null;
+        }
         ad = sponsoredPeer;
+    }
+
+    /** Novagram: show our own sponsored pill with [label] (pass null to clear). */
+    public void setCustomAd(CharSequence label) {
+        if (!TextUtils.equals(customAdLabel, label)) {
+            adText = null;
+        }
+        customAdLabel = label;
+    }
+
+    private boolean hasAdLabel() {
+        return ad != null || customAdLabel != null;
     }
 
     private boolean allowEmojiStatus = true;
@@ -483,15 +503,22 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
             statusLeft = dp(11);
         }
 
-        if (ad != null) {
+        if (hasAdLabel()) {
             if (adText == null) {
-                final SpannableStringBuilder sb = new SpannableStringBuilder(getString(R.string.SearchAd)).append(" i");
-                final ColoredImageSpan span = new ColoredImageSpan(R.drawable.ic_ab_other);
-                span.setScale(.55f, .55f);
-                span.spaceScaleX = .7f;
-                span.translate(-dp(2), 0);
-                sb.setSpan(span, sb.length() - 1, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                adText = new Text(sb, 12);
+                final CharSequence label;
+                if (customAdLabel != null) {
+                    // Our own label — no trailing "i" info icon (there is no sponsored-options menu).
+                    label = customAdLabel;
+                } else {
+                    final SpannableStringBuilder sb = new SpannableStringBuilder(getString(R.string.SearchAd)).append(" i");
+                    final ColoredImageSpan span = new ColoredImageSpan(R.drawable.ic_ab_other);
+                    span.setScale(.55f, .55f);
+                    span.spaceScaleX = .7f;
+                    span.translate(-dp(2), 0);
+                    sb.setSpan(span, sb.length() - 1, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    label = sb;
+                }
+                adText = new Text(label, 12);
             }
             if (adBackgroundPaint == null) {
                 adBackgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -555,7 +582,7 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
         if (drawNameLock) {
             nameWidth -= dp(6) + Theme.dialogs_lockDrawable.getIntrinsicWidth();
         }
-        if (ad != null) {
+        if (hasAdLabel() && adText != null) {
             final int adWidth = (int) adText.getCurrentWidth() + dp(12.66f + 8);
             nameWidth -= adWidth;
             if (LocaleController.isRTL) {
@@ -986,7 +1013,7 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
             statusDrawable.draw(canvas);
         }
 
-        if (ad != null && adText != null && adBackgroundPaint != null) {
+        if (hasAdLabel() && adText != null && adBackgroundPaint != null) {
             final int color = Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider);
             adBackgroundPaint.setColor(Theme.multAlpha(color, .10f));
             final int w = (int) adText.getWidth() + dp(12.66f);

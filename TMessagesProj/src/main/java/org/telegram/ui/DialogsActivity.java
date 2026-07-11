@@ -7941,6 +7941,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 }
             } else if (obj instanceof TLRPC.Chat) {
                 dialogId = -((TLRPC.Chat) obj).id;
+                // Novagram: report a click if this is our sponsored channel (self-guards on the ad's id).
+                org.fenixuz.ads.AdsManager.INSTANCE.clickAd(dialogId);
                 if (!onlySelect) {
                     searchDialogId = dialogId;
                     searchObject = (TLRPC.Chat) obj;
