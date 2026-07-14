@@ -6972,7 +6972,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 ghostItem.getIconView().setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_actionBarDefaultIcon), PorterDuff.Mode.SRC_IN));
             }
         }
-        ghostItem.setVisibility(org.fenixuz.utils.GhostVariable.INSTANCE.getGhostMenuVisibilityOnActionBar() ? View.VISIBLE : View.GONE);
+        // Visibility (incl. the "show on action bar" toggle) is driven by checkUi_itemGhostVisibility(),
+        // so the Ghost button fades out together with the other menu items while the folder-reorder
+        // "Done" button, search, or right-sliding panel is showing — otherwise it overlaps the "Done" text.
+        checkUi_itemGhostVisibility();
     }
 
     public void onResume() {
@@ -13722,6 +13725,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         checkUi_itemDownloadsVisibility();
         checkUi_itemSpeedVisibility();
         checkUi_itemPasscodeVisibility();
+        checkUi_itemGhostVisibility();
         checkUi_itemSearchVisibility();
     }
 
@@ -13752,6 +13756,20 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         final float factor3 = 1f - animatorDoneButtonVisible.getFloatValue();
         final float factor = factor0 * factor1 * factor2 * factor3;
         FragmentFloatingButton.setAnimatedVisibility(passcodeItem, factor);
+    }
+
+    // Novagram: keep the main action-bar Ghost toggle in the same fade group as passcode/search/etc.,
+    // so it disappears while the folder-reorder "Done" button (or search / right-sliding panel) is up.
+    private void checkUi_itemGhostVisibility() {
+        if (ghostItem == null) {
+            return;
+        }
+        final float factor0 = org.fenixuz.utils.GhostVariable.INSTANCE.getGhostMenuVisibilityOnActionBar() ? 1 : 0;
+        final float factor1 = 1f - animatorSearchVisible.getFloatValue();
+        final float factor2 = 1f - getRightSlidingProgress();
+        final float factor3 = 1f - animatorDoneButtonVisible.getFloatValue();
+        final float factor = factor0 * factor1 * factor2 * factor3;
+        FragmentFloatingButton.setAnimatedVisibility(ghostItem, factor);
     }
 
     private void checkUi_itemDownloadsVisibility() {
