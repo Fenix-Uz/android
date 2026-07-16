@@ -791,21 +791,8 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         }
         if (item.instanceOf(AccountCell.Factory.class)) {
             final int account = item.intValue;
-            // Novagram: tap on the right-side switch toggles this account's notifications (on this device);
-            // a tap anywhere else on the row still switches to that account.
-            if (view instanceof AccountCell && ((AccountCell) view).isOnSwitch(x)) {
-                final boolean enabled = !NotificationsController.isAccountNotificationsEnabled(account);
-                MessagesController.getGlobalNotificationsSettings().edit()
-                        .putBoolean(NotificationsController.getAccountNotificationsKey(account), enabled)
-                        .apply();
-                ((AccountCell) view).switchView.setChecked(enabled, true);
-                if (enabled) {
-                    NotificationsController.getInstance(account).showNotifications();
-                } else {
-                    NotificationsController.getInstance(account).hideNotifications();
-                }
-                return;
-            }
+            // Novagram: the per-account notification switch handles its own tap (see AccountCell), so a tap
+            // that reaches the row here is always "switch to this account".
             if (LaunchActivity.instance != null) {
                 LaunchActivity.instance.switchToAccount(account, true);
             }
@@ -1016,6 +1003,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         private TextView counterView;
         // Novagram: per-account notification switch replaces the plain chevron on the right of each row.
         public Switch switchView;
+        private int account;
 
         private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable botDrawable;
         private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable emojiStatusDrawable;
@@ -1061,12 +1049,25 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
             switchView = new Switch(context, resourcesProvider);
             switchView.setColors(Theme.key_switchTrack, Theme.key_switchTrackChecked, Theme.key_windowBackgroundWhite, Theme.key_windowBackgroundWhite);
+            // Novagram: scale the switch down a touch so it reads as a compact, cleaner control in the account
+            // row. It's canvas-drawn, so scaling stays crisp; the tap target is unaffected because isOnSwitch()
+            // measures the layout bounds, not the scaled render.
+            switchView.setScaleX(0.85f);
+            switchView.setScaleY(0.85f);
+            // Novagram: the switch handles its own tap (with its own ripple) rather than letting the tap bubble
+            // up to the whole row. A clickable child makes RecyclerListView skip the full-row selector, so
+            // tapping the switch no longer flashes the entire item. Its full-height box (set below) keeps a
+            // comfortable tap target even though the switch is drawn centered.
+            switchView.setClickable(true);
+            switchView.setOnClickListener(v -> toggleNotifications());
 
             if (LocaleController.isRTL) {
                 textView.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
 
-                addView(switchView, LayoutHelper.createLinear(37, 20, 0, Gravity.CENTER_VERTICAL | Gravity.LEFT, 15, 0, 0, 0));
-                addView(counterView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 20, 0, Gravity.CENTER_VERTICAL, 0, 0, 0, 0));
+                addView(switchView, LayoutHelper.createLinear(37, LayoutHelper.MATCH_PARENT, 0, Gravity.CENTER_VERTICAL | Gravity.LEFT, 15, 0, 0, 0));
+                // Novagram: gap so the unread badge doesn't crowd the notification switch (RTL: badge sits to
+                // the right of the switch). Only applies while the badge is visible.
+                addView(counterView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 20, 0, Gravity.CENTER_VERTICAL, 8, 0, 0, 0));
                 addView(textView, LayoutHelper.createLinear(0, LayoutHelper.MATCH_PARENT, 1f, Gravity.FILL, 18, 0, 0, 0));
                 addView(avatarView, LayoutHelper.createLinear(28, 28, Gravity.CENTER_VERTICAL | Gravity.RIGHT, 18, 0, 18, 0));
 
@@ -1075,8 +1076,10 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
                 addView(avatarView, LayoutHelper.createLinear(28, 28, Gravity.CENTER_VERTICAL | Gravity.LEFT, 18, 0, 18, 0));
                 addView(textView, LayoutHelper.createLinear(0, LayoutHelper.MATCH_PARENT, 1f, Gravity.FILL, 0, 0, 18, 0));
-                addView(counterView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 20, 0, Gravity.CENTER_VERTICAL, 0, 0, 0, 0));
-                addView(switchView, LayoutHelper.createLinear(37, 20, 0, Gravity.CENTER_VERTICAL | Gravity.RIGHT, 0, 0, 15, 0));
+                // Novagram: gap so the unread badge doesn't crowd the notification switch (only when the
+                // badge is visible — a GONE badge ignores its margins, leaving the switch where it was).
+                addView(counterView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 20, 0, Gravity.CENTER_VERTICAL, 0, 0, 8, 0));
+                addView(switchView, LayoutHelper.createLinear(37, LayoutHelper.MATCH_PARENT, 0, Gravity.CENTER_VERTICAL | Gravity.RIGHT, 0, 0, 15, 0));
             }
         }
 
@@ -1087,15 +1090,24 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         }
 
         /**
-         * True if the tap landed on the notification switch (with a generous hit zone), so the caller
-         * toggles this account's notifications instead of switching to the account. Uses laid-out bounds,
-         * so it works for both LTR (switch on the right) and RTL (switch on the left).
+         * Novagram: toggle this account's notifications on this device. Wired to the switch's own click so the
+         * tap stays on the switch (its own ripple) instead of flashing the whole row.
          */
-        public boolean isOnSwitch(float x) {
-            return x >= switchView.getLeft() - dp(10) && x <= switchView.getRight() + dp(10);
+        private void toggleNotifications() {
+            final boolean enabled = !NotificationsController.isAccountNotificationsEnabled(account);
+            MessagesController.getGlobalNotificationsSettings().edit()
+                    .putBoolean(NotificationsController.getAccountNotificationsKey(account), enabled)
+                    .apply();
+            switchView.setChecked(enabled, true);
+            if (enabled) {
+                NotificationsController.getInstance(account).showNotifications();
+            } else {
+                NotificationsController.getInstance(account).hideNotifications();
+            }
         }
 
         public void set(int account) {
+            this.account = account;
             final TLRPC.User user = UserConfig.getInstance(account).getCurrentUser();
 
             avatarDrawable.setInfo(account, user);
