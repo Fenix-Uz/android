@@ -13604,43 +13604,67 @@ public class MessagesStorage extends BaseController {
         // Fenix delete-save: capture deleted messages instead of removing them, depending on the chosen mode.
         int deletedType = DeletedMsg.INSTANCE.getCheckType();
         if ((DeletedMsg.SECOND == deletedType || DeletedMsg.ALL == deletedType) && !clear) {
-            try {
-                String myIds = TextUtils.join(",", messages);
-                if (dialogId != 0) {
-                    cursor = database.queryFinalized(String.format(Locale.US, "SELECT uid, data, read_state, out, mention, mid FROM messages_v2 WHERE mid IN(%s) AND uid = %d", myIds, dialogId));
-                } else {
-                    cursor = database.queryFinalized(String.format(Locale.US, "SELECT uid, data, read_state, out, mention, mid FROM messages_v2 WHERE mid IN(%s) AND is_channel = 0", myIds));
+            // Only real, server-acknowledged messages (id > 0) may be "saved as deleted". Unsent/local
+            // messages (id <= 0) mean the user is aborting their own in-progress send — e.g. pressing X to
+            // cancel a still-uploading video — which is never a deletion to preserve. Those must stay in
+            // `messages` so they are actually hard-deleted below; otherwise the cancelled upload lingers
+            // with a "deleted" tag and can never be removed. (Reported for round-video sends, but it hit
+            // every cancelled upload.) See DeletedMsg / SendMessagesHelper.cancelSendingMessage.
+            ArrayList<Integer> savable = new ArrayList<>();
+            for (int i = 0; i < messages.size(); i++) {
+                Integer id = messages.get(i);
+                if (id != null && id > 0) {
+                    savable.add(id);
                 }
-            } catch (Exception e) {}
-
-            try {
-                while (cursor.next()) {
-                    long did = cursor.longValue(0);
-                    if (DeletedMsg.SECOND == deletedType && By.Me != whoDeleted) {
-                        ArrayList<WhoDeletedMsg> deletedMsgs = DeletedMsg.INSTANCE.getAllIds();
-                        for (Integer message : messages) {
-                            deletedMsgs.add(new WhoDeletedMsg(did, message, whoDeleted));
-                        }
-                        DeletedMsg.INSTANCE.saveDeletedMessagesId(deletedMsgs);
-                        messages.clear();
-                    } else if (DeletedMsg.ALL == deletedType) {
-                        ArrayList<WhoDeletedMsg> deletedMsgs = DeletedMsg.INSTANCE.getAllIds();
-                        ArrayList<Integer> m = new ArrayList();
-                        if (By.Me == whoDeleted) {
-                            m.addAll(DeletedMsg.INSTANCE.sortDeletedIds(did, messages));
-                        }
-                        for (Integer message : messages) {
-                            deletedMsgs.add(new WhoDeletedMsg(did, message, whoDeleted));
-                        }
-                        DeletedMsg.INSTANCE.saveDeletedMessagesId(deletedMsgs);
-                        messages.clear();
-                        messages.addAll(m);
+            }
+            if (!savable.isEmpty()) {
+                // Collect the (dialogId, mid) of the savable messages that actually exist in storage. Done
+                // once here rather than inside a mutating per-row loop, so a multi-message delete can never
+                // double-save entries or drop some. Only rows that exist are preserved.
+                ArrayList<WhoDeletedMsg> found = new ArrayList<>();
+                try {
+                    String myIds = TextUtils.join(",", savable);
+                    if (dialogId != 0) {
+                        cursor = database.queryFinalized(String.format(Locale.US, "SELECT uid, mid FROM messages_v2 WHERE mid IN(%s) AND uid = %d", myIds, dialogId));
+                    } else {
+                        cursor = database.queryFinalized(String.format(Locale.US, "SELECT uid, mid FROM messages_v2 WHERE mid IN(%s) AND is_channel = 0", myIds));
+                    }
+                    while (cursor.next()) {
+                        found.add(new WhoDeletedMsg(cursor.longValue(0), cursor.intValue(1), whoDeleted));
+                    }
+                } catch (Exception e) {
+                } finally {
+                    if (cursor != null) {
+                        cursor.dispose();
+                        cursor = null;
                     }
                 }
-            } catch (Exception e) {}
-            if (cursor != null) {
-                cursor.dispose();
-                cursor = null;
+
+                if (!found.isEmpty()) {
+                    if (DeletedMsg.SECOND == deletedType && By.Me != whoDeleted) {
+                        ArrayList<WhoDeletedMsg> deletedMsgs = DeletedMsg.INSTANCE.getAllIds();
+                        deletedMsgs.addAll(found);
+                        DeletedMsg.INSTANCE.saveDeletedMessagesId(deletedMsgs);
+                        // Preserve the saved messages: drop them from the hard-delete set. Unsent ids (never
+                        // in `found`) stay in `messages` and are hard-deleted below.
+                        for (int i = 0; i < found.size(); i++) {
+                            messages.remove(found.get(i).getId());
+                        }
+                    } else if (DeletedMsg.ALL == deletedType) {
+                        ArrayList<WhoDeletedMsg> deletedMsgs = DeletedMsg.INSTANCE.getAllIds();
+                        ArrayList<Integer> alreadySaved = new ArrayList<>();
+                        if (By.Me == whoDeleted) {
+                            alreadySaved.addAll(DeletedMsg.INSTANCE.sortDeletedIds(dialogId, savable));
+                        }
+                        deletedMsgs.addAll(found);
+                        DeletedMsg.INSTANCE.saveDeletedMessagesId(deletedMsgs);
+                        for (int i = 0; i < found.size(); i++) {
+                            messages.remove(found.get(i).getId());
+                        }
+                        // A By.Me re-delete of an already-saved message really removes it.
+                        messages.addAll(alreadySaved);
+                    }
+                }
             }
         }
 

@@ -22130,7 +22130,24 @@ public class ChatActivity extends BaseFragment implements
             if (fenixDeletedBy) {
                 DeletedMsg.INSTANCE.setMyDelete(false);
             }
-            ArrayList<MessageObject> fenixMessageObjects = DeletedMsg.INSTANCE.notify(markAsDeletedMessages, messages, dialog_id);
+            // Unsent/local messages (id <= 0) are the user aborting their own in-progress send — e.g.
+            // pressing X to cancel a still-uploading video. That is never a deletion to preserve, so split
+            // them out: they are always removed from the chat (never kept or tagged "deleted"), whatever
+            // the delete-save mode. Only real, server-acknowledged messages (id > 0) follow the keep logic.
+            ArrayList<Integer> fenixUnsent = new ArrayList<>();
+            ArrayList<Integer> fenixKeepable = new ArrayList<>();
+            for (int i = 0; i < markAsDeletedMessages.size(); i++) {
+                Integer fenixId = markAsDeletedMessages.get(i);
+                if (fenixId == null) {
+                    continue;
+                }
+                if (fenixId <= 0) {
+                    fenixUnsent.add(fenixId);
+                } else {
+                    fenixKeepable.add(fenixId);
+                }
+            }
+            ArrayList<MessageObject> fenixMessageObjects = DeletedMsg.INSTANCE.notify(fenixKeepable, messages, dialog_id);
             for (int i = 0; i < fenixMessageObjects.size(); i++) {
                 MessageObject old = messagesDict[0].get(fenixMessageObjects.get(i).getId());
                 int index = this.messages.indexOf(old);
@@ -22148,14 +22165,17 @@ public class ChatActivity extends BaseFragment implements
             } else if (DeletedMsg.SECOND == fenixDeletedType) {
                 if (fenixBy == By.Me) {
                     processDeletedMessages(markAsDeletedMessages, channelId, sent, !movedToScheduled);
+                } else if (!fenixUnsent.isEmpty()) {
+                    processDeletedMessages(fenixUnsent, channelId, sent, !movedToScheduled);
                 }
             } else if (DeletedMsg.ALL == fenixDeletedType) {
                 ArrayList<Integer> fenixM = new ArrayList<>();
                 if (fenixBy == By.Me) {
-                    fenixM.addAll(DeletedMsg.INSTANCE.sortDeletedIds(dialog_id, markAsDeletedMessages));
-                    if (!fenixM.isEmpty()) {
-                        processDeletedMessages(fenixM, channelId, sent, !movedToScheduled);
-                    }
+                    fenixM.addAll(DeletedMsg.INSTANCE.sortDeletedIds(dialog_id, fenixKeepable));
+                }
+                fenixM.addAll(fenixUnsent);
+                if (!fenixM.isEmpty()) {
+                    processDeletedMessages(fenixM, channelId, sent, !movedToScheduled);
                 }
             }
             if (actionBar != null && actionBar.isActionModeShowed() && fenixBy == By.Me) {
