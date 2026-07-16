@@ -73,6 +73,9 @@ public class BotsActivity extends BaseFragment {
         items.clear();
         addGroup(347, new String[][]{ // Media & downloads
                 {"novogram_youtube_bot", "YouTube"},
+                {"novagram_instagram_bot", "Instagram"},
+                {"novagram_tiktok_bot", "TikTok"},
+                {"novagram_facebook_bot", "Facebook"},
                 {"novagram_shazam_bot", "Shazam"},
                 {"novagram_spotify_bot", "Spotify"},
                 {"novagram_vk_bot", "VK"},
@@ -80,10 +83,7 @@ public class BotsActivity extends BaseFragment {
                 {"novagram_twitch_bot", "Twitch"},
                 {"novagram_pinterest_bot", "Pinterest"},
                 {"novagram_reddit_bot", "Reddit"},
-                {"novagram_facebook_bot", "Facebook"},
                 {"novagram_twitter_bot", "Twitter"},
-                {"novagram_tiktok_bot", "TikTok"},
-                {"novagram_instagram_bot", "Instagram"},
         });
         addGroup(348, new String[][]{ // Media editing
                 {"novagram_compress_bot", "Compress"},
