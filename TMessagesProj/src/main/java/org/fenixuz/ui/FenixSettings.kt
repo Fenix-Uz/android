@@ -469,6 +469,7 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
                         .setMessage(LanguageCode.getMyTitles(322))
                         .setPositiveButton(LanguageCode.getMyTitles(323)) { _, _ ->
                             StrangerShield.setEnabled(true)
+                            item.checked = true
                             (view as NotificationsCheckCell).setChecked(true)
                             NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.dialogsNeedReload)
                         }
@@ -485,6 +486,13 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
                 args.putBoolean("fenixStrangerInbox", true)
                 presentFragment(DialogsActivity(args))
             }
+        }
+        // Novagram: keep the cached UItem model in sync with the toggled cell. setChecked() only updates the
+        // live view; the RecyclerView rebinds from the UItem on scroll, so without this the row snaps back to
+        // its old (model) value when recycled. Only check cells have a checked state — button rows are skipped.
+        // (STRANGER_SHIELD turns on from an async dialog callback, which sets item.checked itself.)
+        if (view is NotificationsCheckCell) {
+            item.checked = view.isChecked
         }
     }
 
