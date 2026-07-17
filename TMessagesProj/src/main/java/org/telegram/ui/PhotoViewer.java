@@ -15204,9 +15204,11 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                                 mirrorItem.setVisibility(View.GONE);
                                 mirrorItem.setTag(null);
                                 AndroidUtilities.updateViewVisibilityAnimated(muteButton, !sendPhotoTypeIsGif && !isLivePhoto, 1f, animated);
-                                // Novagram: round-video toggle is available for a plain video being sent to a chat.
+                                // Novagram: round-video toggle is available for a plain video being sent to a chat,
+                                // and only for a SINGLE selected item — a video note can never be part of an album,
+                                // so allowing it under multi-select would let the whole group send fail on the server.
                                 // Restore the per-entry round state so it survives paging between selected items.
-                                AndroidUtilities.updateViewVisibilityAnimated(roundVideoButton, !sendPhotoTypeIsGif && !isLivePhoto && parentChatActivity != null, 1f, animated);
+                                AndroidUtilities.updateViewVisibilityAnimated(roundVideoButton, !sendPhotoTypeIsGif && !isLivePhoto && parentChatActivity != null && (placeProvider == null || placeProvider.getSelectedCount() <= 1), 1f, animated);
                                 sendAsRoundVideo = object instanceof MediaController.PhotoEntry && ((MediaController.PhotoEntry) object).editedInfo != null && ((MediaController.PhotoEntry) object).editedInfo.roundVideo;
                                 roundVideoButton.setColorFilter(new PorterDuffColorFilter(sendAsRoundVideo ? getThemedColor(Theme.key_chat_editMediaButton) : 0xFFFFFFFF, PorterDuff.Mode.SRC_IN));
                                 AndroidUtilities.updateViewVisibilityAnimated(livePhotoButton, !sendPhotoTypeIsGif && isLivePhoto && (placeProvider == null || placeProvider.allowLivePhotos()), 1f, animated);

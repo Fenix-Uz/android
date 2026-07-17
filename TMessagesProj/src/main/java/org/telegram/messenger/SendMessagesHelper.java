@@ -10345,7 +10345,10 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                                 // Novagram: a gallery video sent as a round video note. The flag is set only by the
                                 // PhotoViewer round toggle (false for every normal media send), so this is inert for
                                 // regular videos and just tags the outgoing document as a round message (video note).
-                                attributeVideo.round_message = videoEditedInfo != null && videoEditedInfo.roundVideo;
+                                // Never tag a round message inside a multi-item album — a video note cannot belong to
+                                // an album and the server would reject the whole group. This backs up the PhotoViewer
+                                // single-selection gate in case a round flag survives onto an entry that then gets grouped.
+                                attributeVideo.round_message = videoEditedInfo != null && videoEditedInfo.roundVideo && !(groupMediaFinal && count > 1);
                                 document.attributes.add(attributeVideo);
                                 if (videoEditedInfo != null && (videoEditedInfo.needConvert() || !info.isVideo)) {
                                     if (info.isVideo && videoEditedInfo.muted) {
