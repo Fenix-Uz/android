@@ -22130,10 +22130,13 @@ public class ChatActivity extends BaseFragment implements
             if (fenixDeletedBy) {
                 DeletedMsg.INSTANCE.setMyDelete(false);
             }
-            // Unsent/local messages (id <= 0) are the user aborting their own in-progress send — e.g.
-            // pressing X to cancel a still-uploading video. That is never a deletion to preserve, so split
-            // them out: they are always removed from the chat (never kept or tagged "deleted"), whatever
-            // the delete-save mode. Only real, server-acknowledged messages (id > 0) follow the keep logic.
+            // A message the user is aborting mid-send — pressing X to cancel a still-uploading video — is
+            // never a deletion to preserve, so split it out: it is always removed from the chat (never kept
+            // or tagged "deleted"), whatever the delete-save mode. The signal is the in-memory send_state,
+            // NOT the id sign: an in-flight send has send_state != SENT, a delivered message has
+            // send_state == SENT. Using send_state keeps this consistent with the storage layer and, unlike
+            // an id>0 test, still keeps secret-chat messages, whose delivered messages carry negative ids.
+            // A message not in memory can't be an in-progress send the user is watching, so it stays keepable.
             ArrayList<Integer> fenixUnsent = new ArrayList<>();
             ArrayList<Integer> fenixKeepable = new ArrayList<>();
             for (int i = 0; i < markAsDeletedMessages.size(); i++) {
@@ -22141,7 +22144,10 @@ public class ChatActivity extends BaseFragment implements
                 if (fenixId == null) {
                     continue;
                 }
-                if (fenixId <= 0) {
+                MessageObject fenixMsg = messagesDict[0].get(fenixId);
+                boolean fenixSending = fenixMsg != null && fenixMsg.messageOwner != null
+                        && fenixMsg.messageOwner.send_state != MessageObject.MESSAGE_SEND_STATE_SENT;
+                if (fenixSending) {
                     fenixUnsent.add(fenixId);
                 } else {
                     fenixKeepable.add(fenixId);

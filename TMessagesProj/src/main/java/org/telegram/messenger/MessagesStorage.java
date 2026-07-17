@@ -13604,30 +13604,32 @@ public class MessagesStorage extends BaseController {
         // Fenix delete-save: capture deleted messages instead of removing them, depending on the chosen mode.
         int deletedType = DeletedMsg.INSTANCE.getCheckType();
         if ((DeletedMsg.SECOND == deletedType || DeletedMsg.ALL == deletedType) && !clear) {
-            // Only real, server-acknowledged messages (id > 0) may be "saved as deleted". Unsent/local
-            // messages (id <= 0) mean the user is aborting their own in-progress send — e.g. pressing X to
-            // cancel a still-uploading video — which is never a deletion to preserve. Those must stay in
-            // `messages` so they are actually hard-deleted below; otherwise the cancelled upload lingers
-            // with a "deleted" tag and can never be removed. (Reported for round-video sends, but it hit
-            // every cancelled upload.) See DeletedMsg / SendMessagesHelper.cancelSendingMessage.
+            // Only genuinely delivered messages may be "saved as deleted". A message the user is aborting
+            // mid-send — pressing X on a still-uploading video — must NOT be preserved; it has to stay in
+            // `messages` so it is hard-deleted below, otherwise the cancelled upload lingers with a "deleted"
+            // tag forever. The right signal for that is send_state, NOT the id sign: an in-flight send has
+            // send_state = 1, a delivered message has send_state = 0. Filtering on `send_state = 0` in SQL
+            // (below) drops cancelled/unsent sends while still preserving secret-chat messages, whose real
+            // delivered messages carry negative local ids exactly like unsent ones do — an id>0 test would
+            // silently stop capturing them. See DeletedMsg / SendMessagesHelper.cancelSendingMessage.
             ArrayList<Integer> savable = new ArrayList<>();
             for (int i = 0; i < messages.size(); i++) {
                 Integer id = messages.get(i);
-                if (id != null && id > 0) {
+                if (id != null) {
                     savable.add(id);
                 }
             }
             if (!savable.isEmpty()) {
-                // Collect the (dialogId, mid) of the savable messages that actually exist in storage. Done
-                // once here rather than inside a mutating per-row loop, so a multi-message delete can never
-                // double-save entries or drop some. Only rows that exist are preserved.
+                // Collect the (dialogId, mid) of the savable messages that actually exist in storage AND are
+                // fully delivered (send_state = 0). Done once here rather than inside a mutating per-row loop,
+                // so a multi-message delete can never double-save entries or drop some.
                 ArrayList<WhoDeletedMsg> found = new ArrayList<>();
                 try {
                     String myIds = TextUtils.join(",", savable);
                     if (dialogId != 0) {
-                        cursor = database.queryFinalized(String.format(Locale.US, "SELECT uid, mid FROM messages_v2 WHERE mid IN(%s) AND uid = %d", myIds, dialogId));
+                        cursor = database.queryFinalized(String.format(Locale.US, "SELECT uid, mid FROM messages_v2 WHERE mid IN(%s) AND uid = %d AND send_state = 0", myIds, dialogId));
                     } else {
-                        cursor = database.queryFinalized(String.format(Locale.US, "SELECT uid, mid FROM messages_v2 WHERE mid IN(%s) AND is_channel = 0", myIds));
+                        cursor = database.queryFinalized(String.format(Locale.US, "SELECT uid, mid FROM messages_v2 WHERE mid IN(%s) AND is_channel = 0 AND send_state = 0", myIds));
                     }
                     while (cursor.next()) {
                         found.add(new WhoDeletedMsg(cursor.longValue(0), cursor.intValue(1), whoDeleted));
