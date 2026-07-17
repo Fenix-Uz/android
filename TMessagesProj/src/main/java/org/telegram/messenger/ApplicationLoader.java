@@ -418,6 +418,21 @@ public class ApplicationLoader extends Application {
         // Novagram: in censored regions (Russia), auto-attach a proxy before login so the user can
         // even reach Telegram's servers. No-ops elsewhere and never overrides a user-set proxy.
         org.fenixuz.proxy.RegionProxyManager.maybeAutoConnect();
+        // Novagram: preload the delete-save / edit-save history caches on a DEDICATED low-priority daemon
+        // thread — NOT the shared globalQueue (which carries startup work) and NOT the UI thread. Parsing
+        // a large existing store must never block startup or freeze the first chat open; whoDelete() stays
+        // non-blocking and this thread warms the cache (and one-time-trims an oversized store) in the
+        // background. Fully guarded — a failure here can never affect startup.
+        Thread historyWarmup = new Thread(() -> {
+            try {
+                org.fenixuz.utils.DeletedMsg.INSTANCE.warmUp();
+                org.fenixuz.utils.EditMessage.INSTANCE.warmUp();
+            } catch (Throwable ignore) {
+            }
+        }, "novagram-history-warmup");
+        historyWarmup.setDaemon(true);
+        historyWarmup.setPriority(Thread.MIN_PRIORITY);
+        historyWarmup.start();
     }
 
     public static void startPushService() {

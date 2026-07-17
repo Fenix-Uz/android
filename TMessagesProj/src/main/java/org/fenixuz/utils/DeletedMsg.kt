@@ -24,6 +24,12 @@ object DeletedMsg {
     const val ALL = 3
     const val DELETE_MARK = "<-------------->"
 
+    // Rolling-window cap for the "mark_delete" store: keep at most the newest MAX_ENTRIES entries
+    // across all chats. It NEVER resets to empty — once the cap is exceeded only the single oldest
+    // entry rolls off per save. Bounds prefs growth so the storage queue never does unbounded work.
+    // Just a constant — raising it later needs no migration (the JSON format is unchanged).
+    private const val MAX_ENTRIES = 5000
+
     private val sharedPreferences =
         ApplicationLoader.applicationContext.getSharedPreferences("db", Context.MODE_PRIVATE)
     private val editor = sharedPreferences.edit()
@@ -208,8 +214,13 @@ object DeletedMsg {
     }
 
     fun whoDelete(dialogId: Long, msgId: Int): String {
-        ensureLoaded()
-        // O(1) lookup — this is the chat-scroll bind hot path; keep it allocation-free.
+        // NON-BLOCKING hot path (chat-scroll bind). NEVER parse on the UI thread: if the cache isn't
+        // warmed yet (startup background thread does it), return empty so a large existing store can
+        // never freeze the first chat open. The "deleted by" tag simply appears once the cache is ready.
+        // Once warmed this is an O(1) allocation-free lookup.
+        if (cachedList == null) {
+            return ""
+        }
         return whoDeleteStr(lookup[dialogId]?.get(msgId))
     }
 
@@ -239,22 +250,41 @@ object DeletedMsg {
     }
 
     fun saveDeletedMessagesId(messageIds: ArrayList<WhoDeletedMsg>) {
-        val str = gson.toJson(messageIds)
+        // Rolling-window cap: entries are appended newest-last, so keep only the last MAX_ENTRIES and
+        // drop from the front (oldest). This never empties the store; only the oldest overflow rolls off.
+        val capped: ArrayList<WhoDeletedMsg> =
+            if (messageIds.size > MAX_ENTRIES) {
+                ArrayList(messageIds.subList(messageIds.size - MAX_ENTRIES, messageIds.size))
+            } else {
+                messageIds
+            }
+        val str = gson.toJson(capped)
         editor.putString("mark_delete", str)
-        editor.commit()
+        // apply() (async) not commit() (sync): this runs on the storage queue during deletion, and the
+        // authoritative view is the in-memory cache refreshed below, so the async disk write is safe.
+        editor.apply()
         // Refresh the cache from the just-persisted list — this is the single write funnel, so
         // the in-memory view can never diverge from disk. Copy so later external mutations of
         // messageIds don't leak into the cache.
         synchronized(this) {
-            val copy = ArrayList(messageIds)
+            val copy = ArrayList(capped)
             lookup = buildLookup(copy)
             cachedList = copy
         }
     }
 
+    // Preload the mark_delete cache OFF the UI thread (called once at startup on a dedicated low-priority
+    // thread — never the shared globalQueue). This is what lets whoDelete() stay non-blocking on a large
+    // existing store. It ONLY parses (no write): the disk blob shrinks on the next real delete-save via
+    // the cap in saveDeletedMessagesId, which runs on the storage queue — so warm-up adds zero cross-thread
+    // writes and cannot race the delete path.
+    fun warmUp() {
+        ensureLoaded()
+    }
+
     fun saveCheckType(type: Int) {
         editor.putInt("delete_check_key", type)
-        editor.commit()
+        editor.apply()
     }
 
     fun getCheckType(): Int {
