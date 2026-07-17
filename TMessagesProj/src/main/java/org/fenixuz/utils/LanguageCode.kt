@@ -1717,6 +1717,8 @@ object LanguageCode {
         titlesLanguages.add(TitleLanguages(350, "Useful & fun", "Foydali va ko'ngil ochar", "Полезное и развлечения"))
         titlesLanguages.add(TitleLanguages(351, "Copy link", "Havolani nusxalash", "Скопировать ссылку"))
         titlesLanguages.add(TitleLanguages(352, "Send link", "Havolani jo'natish", "Отправить ссылку"))
+        titlesLanguages.add(TitleLanguages(353, "Round video", "Dumaloq video", "Видеосообщения"))
+        titlesLanguages.add(TitleLanguages(354, "Record round video messages with the front camera. Turn it off to use the rear camera. You can still flip the camera while recording.", "Dumaloq video xabarlarni old kameradan yozadi. O'chirilsa — orqa kameradan. Yozuv paytida kamerani baribir almashtira olasiz.", "Записывать видеосообщения (кружки) с фронтальной камеры. Выключите — будет задняя. Во время записи камеру всё равно можно переключить."))
     }
 
     init {

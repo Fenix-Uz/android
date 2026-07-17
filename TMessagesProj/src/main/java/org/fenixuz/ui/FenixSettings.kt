@@ -17,6 +17,7 @@ import org.telegram.messenger.NotificationCenter
 import org.telegram.messenger.R
 import org.telegram.ui.ActionBar.ActionBar
 import org.fenixuz.utils.AutoAcceptJoin
+import org.fenixuz.utils.CameraSituation
 import org.fenixuz.utils.ConfirmDialogsPref
 import org.fenixuz.utils.GhostStory
 import org.fenixuz.utils.HideTabs
@@ -84,6 +85,7 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
     private val CHANGE_COMMON_PASSWORD = 24
     private val FINGERPRINT_UNLOCK = 25
     private val GHOST_ACTIONBAR_BTN = 26
+    private val ROUND_CAMERA_FRONT = 27
 
     // Onboarding: a toolbar "?" replays the full feature tour; the short tour auto-runs once on first open.
     private val HELP_BUTTON = 1001
@@ -111,7 +113,8 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
         HIDE_TABS to "hide_tabs",
         AUTO_ACCEPT_JOIN to "auto_accept_join",
         REMINDER_ENABLED to "reminder",
-        STRANGER_SHIELD to "protection_from_strangers"
+        STRANGER_SHIELD to "protection_from_strangers",
+        ROUND_CAMERA_FRONT to "round_video_camera"
     )
     private var targetConsumed = false
     private var flashAnimator: ValueAnimator? = null
@@ -198,7 +201,8 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
         step(HIDE_TABS, 260, 261),
         step(AUTO_ACCEPT_JOIN, 263, 264),
         step(REMINDER_ENABLED, 270, 271),
-        step(STRANGER_SHIELD, 319, 320)
+        step(STRANGER_SHIELD, 319, 320),
+        step(ROUND_CAMERA_FRONT, 353, 354)
     )
 
     private fun startTour() {
@@ -305,6 +309,15 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
         items.add(
             UItem.asButtonCheck(CONFIRM_GIF, LanguageCode.getMyTitles(212), LanguageCode.getMyTitles(193))
                 .setChecked(ConfirmDialogsPref.confirmGif)
+        )
+        items.add(UItem.asShadow(null))
+
+        // Round video note camera — a persistent choice (front by default) used every time a round
+        // video is recorded, instead of the old always-ask popup. Title reuses "Front camera" (113).
+        items.add(UItem.asHeader(LanguageCode.getMyTitles(353)))
+        items.add(
+            UItem.asButtonCheck(ROUND_CAMERA_FRONT, LanguageCode.getMyTitles(113), LanguageCode.getMyTitles(354))
+                .setChecked(CameraSituation.isFront)
         )
         items.add(UItem.asShadow(null))
 
@@ -437,6 +450,12 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
             CONFIRM_GIF -> {
                 ConfirmDialogsPref.changeConfirmGifMode()
                 (view as NotificationsCheckCell).setChecked(ConfirmDialogsPref.confirmGif)
+            }
+            ROUND_CAMERA_FRONT -> {
+                // ON = front camera, OFF = rear. Persisted in CameraSituation; InstantCameraView reads it
+                // on open. No popup — the saved choice applies to every round video from now on.
+                CameraSituation.isFront = !CameraSituation.isFront
+                (view as NotificationsCheckCell).setChecked(CameraSituation.isFront)
             }
             FOLDER_ICONS -> {
                 FolderIcons.setIconMode(!FolderIcons.isIconMode())

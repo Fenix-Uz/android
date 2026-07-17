@@ -117,7 +117,6 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 
 import org.telegram.messenger.AccountInstance;
 import org.fenixuz.ui.text_style_dialog.TextStyleDialog;
-import org.fenixuz.utils.CameraSituation;
 import org.fenixuz.utils.ConfirmDialogsPref;
 import org.fenixuz.utils.MyStatus;
 import kotlin.Unit;
@@ -915,31 +914,27 @@ public class ChatActivityEnterView extends FrameLayout implements
                         return;
                     }
                 }
-                // Fenix: ask front/back camera before opening the camera for a video message.
-                CameraSituation.INSTANCE.showPopupMenu(getContext(), audioVideoButtonContainer, new Function1<Integer, Unit>() {
-                    @Override
-                    public Unit invoke(Integer integer) {
-                        if (!CameraController.getInstance().isCameraInitied()) {
-                            CameraController.getInstance().initCamera(onFinishInitCameraRunnable);
-                        } else {
-                            onFinishInitCameraRunnable.run();
-                        }
-                        if (!recordingAudioVideo) {
-                            recordingAudioVideo = true;
-                            updateRecordInterface(RECORD_STATE_ENTER, true);
-                            if (recordCircle != null) {
-                                recordCircle.showWaves(false, false);
-                            }
-                            if (recordTimerView != null) {
-                                recordTimerView.reset();
-                            }
-                        }
-                        recordCircle.setLockTranslation(60);
-                        sendButtonVisible = true;
-                        startLockTransition();
-                        return null;
+                // Novagram: open the camera straight away using the saved round-video camera preference
+                // (Settings ▸ Round video ▸ Front camera). Front/back is a persistent toggle now, so there
+                // is no per-recording popup — InstantCameraView reads CameraSituation.isFront when it opens.
+                if (!CameraController.getInstance().isCameraInitied()) {
+                    CameraController.getInstance().initCamera(onFinishInitCameraRunnable);
+                } else {
+                    onFinishInitCameraRunnable.run();
+                }
+                if (!recordingAudioVideo) {
+                    recordingAudioVideo = true;
+                    updateRecordInterface(RECORD_STATE_ENTER, true);
+                    if (recordCircle != null) {
+                        recordCircle.showWaves(false, false);
                     }
-                });
+                    if (recordTimerView != null) {
+                        recordTimerView.reset();
+                    }
+                }
+                recordCircle.setLockTranslation(60);
+                sendButtonVisible = true;
+                startLockTransition();
             } else {
                 if (Build.VERSION.SDK_INT >= 23 && parentActivity.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                     parentActivity.requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 3);
