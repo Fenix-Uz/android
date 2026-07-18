@@ -8,7 +8,6 @@ import com.google.gson.reflect.TypeToken
 import org.fenixuz.ui.lock.LockCredential
 import org.fenixuz.ui.lock.LockEditor
 import org.telegram.messenger.ApplicationLoader
-import org.telegram.messenger.FingerprintController
 
 /**
  * Chat-lock store supporting TWO modes per chat:
@@ -28,7 +27,6 @@ object Password {
     private const val PASSWORD_LOCATE = "chat_lock_password"      // the shared/common passcode
     private const val IDS_LOCATE = "chat_lock_ids"                // ids locked with the common passcode
     private const val INDIVIDUAL_LOCATE = "chat_lock_individual"  // id -> its own passcode
-    private const val FINGERPRINT_LOCATE = "chat_lock_fingerprint" // global: offer biometric unlock
 
     private val sharedPreferences =
         ApplicationLoader.applicationContext.getSharedPreferences("db", Context.MODE_PRIVATE)
@@ -89,21 +87,9 @@ object Password {
 
     // endregion
 
-    // region fingerprint (global — applies to every locked chat, common or individual)
+    // region fingerprint (automatic — offered on every locked chat when the device supports biometrics)
 
-    /** User pref: offer biometric unlock on the lock screen. */
-    fun isFingerprintEnabled(): Boolean = sharedPreferences.getBoolean(FINGERPRINT_LOCATE, false)
-
-    fun setFingerprintEnabled(enabled: Boolean) {
-        sharedPreferences.edit().putBoolean(FINGERPRINT_LOCATE, enabled).apply()
-        if (enabled) {
-            // Ensure the AndroidKeyStore key the lock screen's BiometricPrompt relies on exists
-            // (generated lazily when the device has a secure keyguard + an enrolled fingerprint).
-            FingerprintController.checkKeyReady()
-        }
-    }
-
-    /** Whether the device can actually do strong biometric auth — gate the toggle on this. */
+    /** Whether the device can actually do strong biometric auth — drives whether fingerprint is offered. */
     fun isFingerprintHardwareAvailable(): Boolean {
         if (Build.VERSION.SDK_INT < 23) {
             return false
@@ -199,14 +185,15 @@ object Password {
         return if (individual != null) {
             object : LockCredential {
                 override val type: Int? get() = individual.type
-                // Biometric unlock is a single global option, not per-passcode.
-                override val fingerPrint: Boolean get() = isFingerprintEnabled()
+                // Biometric unlock is automatic: offered whenever the device supports strong biometrics.
+                // No per-chat or global opt-in — the passcode always remains as the fallback.
+                override val fingerPrint: Boolean get() = isFingerprintHardwareAvailable()
                 override fun check(input: String): Boolean = individual.password == input
             }
         } else {
             object : LockCredential {
                 override val type: Int? get() = getCommonPassword()?.type
-                override val fingerPrint: Boolean get() = isFingerprintEnabled()
+                override val fingerPrint: Boolean get() = isFingerprintHardwareAvailable()
                 override fun check(input: String): Boolean = checkCommon(input)
             }
         }

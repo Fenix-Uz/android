@@ -83,7 +83,6 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
     private val GHOST_MODE = 22
     private val SECRET_CHAT = 23
     private val CHANGE_COMMON_PASSWORD = 24
-    private val FINGERPRINT_UNLOCK = 25
     private val GHOST_ACTIONBAR_BTN = 26
     private val ROUND_CAMERA_FRONT = 27
 
@@ -280,20 +279,11 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
         )
         items.add(UItem.asShadow(null))
 
-        // Chat-lock management — same conditional rows the hidden screen used to show.
-        val showChangeCommon = Password.hasCommonPassword()
-        val showFingerprint = Password.hasAnyLock() && Password.isFingerprintHardwareAvailable()
-        if (showChangeCommon || showFingerprint) {
+        // Chat-lock management — just the "change common password" row. Fingerprint unlock is now
+        // automatic on any biometric device (no toggle needed), so it no longer appears here.
+        if (Password.hasCommonPassword()) {
             items.add(UItem.asHeader(LanguageCode.getMyTitles(252)))
-            if (showChangeCommon) {
-                items.add(UItem.asButton(CHANGE_COMMON_PASSWORD, LanguageCode.getMyTitles(251)))
-            }
-            if (showFingerprint) {
-                items.add(
-                    UItem.asButtonCheck(FINGERPRINT_UNLOCK, LanguageCode.getMyTitles(253), LanguageCode.getMyTitles(254))
-                        .setChecked(Password.isFingerprintEnabled())
-                )
-            }
+            items.add(UItem.asButton(CHANGE_COMMON_PASSWORD, LanguageCode.getMyTitles(251)))
             items.add(UItem.asShadow(null))
         }
 
@@ -408,11 +398,6 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
             }
             CHANGE_COMMON_PASSWORD -> {
                 presentFragment(SecretPasscodeScreen(Password.editorForCommonPassword(), SecretPasswordType.SET_NEW))
-            }
-            FINGERPRINT_UNLOCK -> {
-                val enabled = !Password.isFingerprintEnabled()
-                Password.setFingerprintEnabled(enabled)
-                (view as NotificationsCheckCell).setChecked(enabled)
             }
             STORY_GHOST -> {
                 GhostStory.changeGhostMode(!GhostStory.ghostMode)

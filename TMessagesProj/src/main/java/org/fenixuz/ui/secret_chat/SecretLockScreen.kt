@@ -782,12 +782,21 @@ class SecretLockScreen(
     private fun checkFingerprintButton() {
         var hasFingerprint = false
         val parentActivity = AndroidUtilities.findActivity(context)
-        if (Build.VERSION.SDK_INT >= 23 && parentActivity != null && (isFingerPrint ?: false)) {
+        if (Build.VERSION.SDK_INT >= 23 && parentActivity != null && isFingerPrint) {
             try {
-                val fingerprintManager = FingerprintManagerCompat.from(ApplicationLoader.applicationContext)
-                if (fingerprintManager.isHardwareDetected && fingerprintManager.hasEnrolledFingerprints() &&
-                    FingerprintController.isKeyReady() && !FingerprintController.checkDeviceFingerprintsChanged()
-                ) {
+                // Gate on the SAME modern API the real BiometricPrompt uses (see checkFingerprint()),
+                // NOT the deprecated FingerprintManagerCompat: on many current devices the legacy API
+                // reports isHardwareDetected/hasEnrolledFingerprints == false even though BiometricPrompt
+                // works fine, which used to hide this button forever (fingerprint "never showed").
+                val biometricReady = BiometricManager.from(context)
+                    .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
+                // Generate the AndroidKeyStore key lazily if it isn't there yet. checkKeyReady() only acts
+                // when the keyguard is secure + biometric enrolled, runs off-thread, and posts
+                // didGenerateFingerprintKeyPair — the observer above then re-runs this and auto-prompts.
+                if (biometricReady && !FingerprintController.isKeyReady()) {
+                    FingerprintController.checkKeyReady()
+                }
+                if (biometricReady && FingerprintController.isKeyReady() && !FingerprintController.checkDeviceFingerprintsChanged()) {
                     hasFingerprint = true
                     fingerprintView!!.visibility = VISIBLE
                 } else {
@@ -818,6 +827,14 @@ class SecretLockScreen(
     ) {
         checkFingerprintButton()
         checkRetryTextView()
+        // Honour the long-dead `fingerprint` flag: when the lock screen is FIRST shown for unlocking and
+        // the fingerprint button is available (key already generated), pop the biometric prompt immediately
+        // — "open a locked chat → it asks for your fingerprint". The `visibility != VISIBLE` guard mirrors
+        // the early-return below so a repeat onShow() can't stack a second prompt. If the key is still
+        // generating the button is GONE here and the didGenerateFingerprintKeyPair observer fires it once ready.
+        if (fingerprint && visibility != VISIBLE && fingerprintView!!.visibility == VISIBLE) {
+            checkFingerprint()
+        }
         val parentActivity = AndroidUtilities.findActivity(context)
         if (type == SharedConfig.PASSCODE_TYPE_PASSWORD) {
             if (!animated && retryTextView.visibility != VISIBLE) {
