@@ -22,6 +22,8 @@ import android.widget.TextView;
 import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.RecyclerView;
 
+import org.fenixuz.utils.By;
+import org.fenixuz.utils.DeletedMsg;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.BotWebViewVibrationEffect;
 import org.telegram.messenger.ChatObject;
@@ -951,11 +953,18 @@ public class DeleteMessagesBottomSheet extends BottomSheetWithRecyclerListView {
                 .map(MessageObject::getId)
                 .collect(Collectors.toCollection(ArrayList::new));
 
+        // Fenix delete-save: an admin deleting other members' messages here is a DELIBERATE delete (By.Me),
+        // exactly like the classic delete dialog. Without this tag the delete-save interception mistakes it
+        // for a server-pushed "someone else deleted" event and PRESERVES the message instead of removing it,
+        // so the message won't delete at all while delete-save is on. Set myDelete right before each call so
+        // its synchronous messagesDeleted handler in ChatActivity also treats it as By.Me (removes from view).
         if (!supergroupMessageIds.isEmpty()) {
-            MessagesController.getInstance(currentAccount).deleteMessages(supergroupMessageIds, null, null, -inChat.id, topicId, false, mode);
+            DeletedMsg.INSTANCE.setMyDelete(true);
+            MessagesController.getInstance(currentAccount).deleteMessages(supergroupMessageIds, null, null, -inChat.id, topicId, false, mode, By.Me);
         }
         if (!groupMessageIds.isEmpty()) {
-            MessagesController.getInstance(currentAccount).deleteMessages(groupMessageIds, null, null, mergeDialogId, topicId, true, mode);
+            DeletedMsg.INSTANCE.setMyDelete(true);
+            MessagesController.getInstance(currentAccount).deleteMessages(groupMessageIds, null, null, mergeDialogId, topicId, true, mode, By.Me);
         }
 
         banOrRestrict.forEachSelected((participant, i) -> {
