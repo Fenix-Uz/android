@@ -1101,6 +1101,19 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             switchView.setChecked(enabled, true);
             if (enabled) {
                 NotificationsController.getInstance(account).showNotifications();
+                // Novagram: a background (non-selected) account whose connection has gone idle while it was
+                // muted won't wake on its own — the notification path is the only thing that nudges the socket
+                // (resumeNetworkMaybe, NotificationsController.showOrUpdateNotification), and it's gated behind
+                // notifications being ON *and* a pending message, so re-enabling with nothing queued never
+                // fires it. Wake the socket explicitly here so the account reconnects, runs getDifference and
+                // starts delivering again. This is the same partial-resume the notification path uses; it just
+                // returns the account to its post-startup "warmed" state (which delivers). Enable-only: the OFF
+                // branch is untouched, so a muted account is never woken. Guard on isClientActivated() to match
+                // the established pattern (ContactsController / PushListenerController do the same) so a stale row
+                // for an account logged out while Settings stayed open can never nudge a dead account.
+                if (UserConfig.getInstance(account).isClientActivated()) {
+                    ConnectionsManager.getInstance(account).resumeNetworkMaybe();
+                }
             } else {
                 NotificationsController.getInstance(account).hideNotifications();
             }
