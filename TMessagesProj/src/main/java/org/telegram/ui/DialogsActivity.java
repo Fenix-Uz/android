@@ -10222,7 +10222,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         final SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
         boolean proxyEnabled = preferences.getBoolean("proxy_enabled", false);
         final boolean connected = currentConnectionState == ConnectionsManager.ConnectionStateConnected || currentConnectionState == ConnectionsManager.ConnectionStateUpdating;
-        proxyMenuSubItem.setSubtext(getString(connected ? R.string.MenuProxyConnected : R.string.MenuProxyConnecting));
+        // Novagram: the proxy row is now always present in the menu, so the "Connected/Connecting" subtext
+        // must only appear while a proxy is actually enabled — otherwise it would read "Connected" next to a
+        // proxy that is switched off. Empty subtext collapses the line (see ActionBarMenuSubItem.setSubtext).
+        proxyMenuSubItem.setSubtext(proxyEnabled ? getString(connected ? R.string.MenuProxyConnected : R.string.MenuProxyConnecting) : null);
         proxyDrawable.setConnected(proxyEnabled, connected, animated);
     }
 
@@ -13447,15 +13450,23 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 final SharedPreferences preferences = ApplicationLoader.applicationContext
                         .getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
 
+                // Novagram: Telegram only surfaced this row once a proxy was already running (or the country
+                // was blocked), so a user who had never set one up had no way to *find* proxy settings from
+                // the main screen. We always show it. The subtext is resolved here so it is already correct
+                // the moment the menu opens: connection state while a proxy is active, nothing when it is off
+                // (setSubtext hides the line and re-centers the title on empty text).
                 final String proxyAddress = preferences.getString("proxy_ip", "");
-                final boolean proxyEnabled = preferences.getBoolean("proxy_enabled", false);
-                final boolean proxyVisible = proxyEnabled && !TextUtils.isEmpty(proxyAddress)
-                        || getMessagesController().blockedCountry && !SharedConfig.proxyList.isEmpty();
-
-                if (proxyVisible) {
-                    io.addGap();
-                    io.add(proxyMenuSubItem);
+                final boolean proxyActive = preferences.getBoolean("proxy_enabled", false) && !TextUtils.isEmpty(proxyAddress);
+                if (proxyActive) {
+                    final boolean connected = currentConnectionState == ConnectionsManager.ConnectionStateConnected
+                            || currentConnectionState == ConnectionsManager.ConnectionStateUpdating;
+                    proxyMenuSubItem.setSubtext(getString(connected ? R.string.MenuProxyConnected : R.string.MenuProxyConnecting));
+                } else {
+                    proxyMenuSubItem.setSubtext(null);
                 }
+
+                io.addGap();
+                io.add(proxyMenuSubItem);
             }
         } else {
             io.add(R.drawable.msg_customize, getString(R.string.ArchiveSettings), () -> presentFragment(new ArchiveSettingsActivity()));
