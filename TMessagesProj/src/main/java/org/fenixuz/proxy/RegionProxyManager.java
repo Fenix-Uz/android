@@ -8,6 +8,7 @@ import android.text.TextUtils;
 import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.remoteconfig.FirebaseRemoteConfig;
 import com.google.firebase.remoteconfig.FirebaseRemoteConfigSettings;
+import com.google.firebase.remoteconfig.FirebaseRemoteConfigValue;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -38,6 +39,9 @@ import java.util.concurrent.TimeUnit;
  * Config console, so blocked entries can be swapped without shipping an update.
  *
  * Rules that keep this from fighting the user / hurting startup:
+ *  - does NOTHING unless the owner grants the remote master permit ({@link #RC_ACTIVE}); a
+ *    server-delivered {@code false} is also a kill switch that shuts our proxy down on every device at
+ *    once (used when the pool goes bad) — an absent field or a failed fetch never kills;
  *  - never touches anything if the user already enabled a proxy themselves;
  *  - can be disabled by the user via {@link #PREF_AUTO};
  *  - once we have auto-applied a proxy and the user then turns it OFF (the switch, deleting the active
@@ -57,10 +61,19 @@ public final class RegionProxyManager {
     private static final String RC_REGIONS = "proxy_regions";
     /** Remote Config key: when true, apply regardless of region — for testing / global rollout. */
     private static final String RC_FORCE = "proxy_force_all";
+    /**
+     * Remote Config MASTER permit (default false): auto-proxy does nothing unless the owner sets this to
+     * true in the console. A server-delivered {@code false} is also the KILL switch — it tears down a proxy
+     * we applied so a bad pool can be stopped on every device at once. Absent field / failed fetch never
+     * kills (only an explicit REMOTE {@code false} does).
+     */
+    private static final String RC_ACTIVE = "ru_proxy_active";
     /** User switch for Novagram's auto-proxy (default on). */
     public static final String PREF_AUTO = "novagram_region_proxy_auto";
     /** Marks that we, not the user, turned the current proxy on. */
     public static final String PREF_APPLIED = "novagram_region_proxy_applied";
+    /** "ip:port" of the proxy we last auto-applied, so the kill switch only ever disables OUR proxy. */
+    private static final String PREF_APPLIED_ENDPOINT = "novagram_region_proxy_endpoint";
 
     private static final long FETCH_TIMEOUT_SECONDS = 15;
 
@@ -82,18 +95,26 @@ public final class RegionProxyManager {
         if (!prefs.getBoolean(PREF_AUTO, true)) {
             return; // user opted out of Novagram auto-proxy
         }
-        if (prefs.getBoolean("proxy_enabled", false)) {
-            return; // a proxy is already active (user's own or ours from a previous run) — leave it
-        }
-        // Novagram: we auto-applied a proxy on an earlier run and it is now OFF. The proxy only turns off
-        // by a deliberate act — the user flipping the switch, deleting the active proxy, or dismissing
-        // Telegram's "proxy error" dialog (nothing auto-writes proxy_enabled=false; ProxyRotationController
-        // only ever sets it true). Re-enabling here would fight the user: a dead proxy pool means proxy
-        // fails → they turn it off → next launch we switch it back on → stuck at "Connecting…". So once our
-        // proxy has been turned off, we leave it off; the user re-enables a proxy by hand if they want one.
-        if (prefs.getBoolean(PREF_APPLIED, false)) {
+        boolean proxyOn = prefs.getBoolean("proxy_enabled", false);
+        boolean weApplied = prefs.getBoolean(PREF_APPLIED, false);
+        // The active proxy is the user's OWN (enabled, but we never applied it) — never touch it.
+        if (proxyOn && !weApplied) {
             return;
         }
+        // Our auto-proxy was applied on an earlier run and is now OFF. The proxy only turns off by a
+        // deliberate act — the user flipping the switch, deleting the active proxy, or dismissing Telegram's
+        // "proxy error" dialog (nothing auto-writes proxy_enabled=false; ProxyRotationController only ever
+        // sets it true). Re-enabling here would fight the user: a dead proxy pool means proxy fails → they
+        // turn it off → next launch we switch it back on → stuck at "Connecting…". So once our proxy has
+        // been turned off by the user, we leave it off; they re-enable a proxy by hand if they want one.
+        if (!proxyOn && weApplied) {
+            return;
+        }
+        // What remains needs the network decision, made after the Remote Config fetch:
+        //  - proxy OFF & we never applied → fresh candidate: attach only if the owner granted the remote
+        //    master permit (ru_proxy_active) and the region matches;
+        //  - proxy ON  & we applied it    → our proxy is up: we still fetch so the remote KILL switch can
+        //    reach it and shut it down everywhere at once if our pool goes bad.
         running = true;
         // Dedicated daemon thread: fetchAndDecide() blocks (bounded) on the Remote Config fetch, so
         // keep it off both the main thread and the shared dispatch queues.
@@ -108,6 +129,7 @@ public final class RegionProxyManager {
 
             // Safe in-app defaults so the gate is deterministic even before the first server fetch.
             HashMap<String, Object> defaults = new HashMap<>();
+            defaults.put(RC_ACTIVE, false);
             defaults.put(RC_FORCE, false);
             defaults.put(RC_REGIONS, "ru");
             defaults.put(RC_KEY, "");
@@ -128,6 +150,24 @@ public final class RegionProxyManager {
             try {
                 Tasks.await(rc.fetchAndActivate(), FETCH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             } catch (Throwable ignore) {
+            }
+
+            // Master remote permit. Auto-proxy does NOTHING unless the owner explicitly grants it by setting
+            // ru_proxy_active=true in the console — the "only works if I allow it" gate.
+            FirebaseRemoteConfigValue activeValue = rc.getValue(RC_ACTIVE);
+            boolean active = activeValue.asBoolean();
+            boolean fromServer = activeValue.getSource() == FirebaseRemoteConfig.VALUE_SOURCE_REMOTE;
+            if (!active) {
+                // Permit not granted. If the server EXPLICITLY delivered active=false, that is the kill
+                // switch — shut our proxy down. But a missing field, a failed fetch or the in-app default
+                // must NEVER mass-kill a working proxy, so we only kill on a real REMOTE value.
+                if (fromServer) {
+                    FileLog.d("RegionProxyManager: remote permit OFF — kill switch");
+                    AndroidUtilities.runOnUIThread(RegionProxyManager::killOnMain);
+                    return;
+                }
+                running = false;
+                return;
             }
 
             boolean force = rc.getBoolean(RC_FORCE);
@@ -237,7 +277,21 @@ public final class RegionProxyManager {
         try {
             SharedPreferences prefs = MessagesController.getGlobalMainSettings();
             if (prefs.getBoolean("proxy_enabled", false)) {
-                return; // user enabled a proxy while we were fetching — don't override
+                // A proxy is already on — don't override it. But if it is OUR applied proxy from a build
+                // that predates the endpoint marker (i.e. an upgrade), backfill the marker now so the remote
+                // kill switch can target it later. Backfill ONLY when the active proxy is genuinely one from
+                // our current pool, so a user's own proxy is never mislabelled as ours.
+                if (prefs.getBoolean(PREF_APPLIED, false)
+                        && TextUtils.isEmpty(prefs.getString(PREF_APPLIED_ENDPOINT, ""))) {
+                    String cur = prefs.getString("proxy_ip", "") + ":" + prefs.getInt("proxy_port", 0);
+                    for (SharedConfig.ProxyInfo p : parsed) {
+                        if ((p.address + ":" + p.port).equals(cur)) {
+                            prefs.edit().putString(PREF_APPLIED_ENDPOINT, cur).apply();
+                            break;
+                        }
+                    }
+                }
+                return;
             }
             SharedConfig.loadProxyList();
 
@@ -284,11 +338,51 @@ public final class RegionProxyManager {
                     .putString("proxy_secret", pick.secret)
                     .putBoolean("proxy_enabled", true)
                     .putBoolean(PREF_APPLIED, true)
+                    .putString(PREF_APPLIED_ENDPOINT, pick.address + ":" + pick.port)
                     .apply();
 
             ConnectionsManager.setProxySettings(true, pick.address, pick.port, pick.username, pick.password, pick.secret);
             NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxySettingsChanged);
             FileLog.d("RegionProxyManager: applied " + pick.address + ":" + pick.port + " (pool=" + SharedConfig.proxyList.size() + ")");
+        } catch (Throwable ignore) {
+        } finally {
+            running = false;
+        }
+    }
+
+    /**
+     * Remote kill switch. The owner set ru_proxy_active=false, so tear down the proxy WE auto-applied.
+     * Runs on the main thread (where proxy settings are otherwise mutated). Safety rails:
+     *  - only acts when a proxy is actually enabled;
+     *  - only touches a proxy WE applied ({@link #PREF_APPLIED}) whose endpoint still matches the one we
+     *    set — if the user has since switched to their own proxy, the endpoints differ and we leave it be;
+     *  - clears {@link #PREF_APPLIED} so a later re-grant (ru_proxy_active=true) is free to reconnect. That
+     *    is the one thing separating our kill from a USER turn-off: a user turn-off keeps PREF_APPLIED set
+     *    and stays locked off, while our kill clears it so the pool can come back once it is healthy again.
+     */
+    private static void killOnMain() {
+        try {
+            SharedPreferences prefs = MessagesController.getGlobalMainSettings();
+            if (!prefs.getBoolean("proxy_enabled", false)) {
+                return; // nothing enabled to kill
+            }
+            if (!prefs.getBoolean(PREF_APPLIED, false)) {
+                return; // the active proxy is the user's own — never kill it
+            }
+            String applied = prefs.getString(PREF_APPLIED_ENDPOINT, "");
+            String current = prefs.getString("proxy_ip", "") + ":" + prefs.getInt("proxy_port", 0);
+            if (TextUtils.isEmpty(applied) || !applied.equals(current)) {
+                return; // the user switched to a different proxy since we applied — leave it alone
+            }
+            prefs.edit()
+                    .putBoolean("proxy_enabled", false)
+                    .putBoolean("proxy_enabled_calls", false)
+                    .putBoolean(PREF_APPLIED, false)
+                    .remove(PREF_APPLIED_ENDPOINT)
+                    .apply();
+            ConnectionsManager.setProxySettings(false, "", 0, "", "", "");
+            NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxySettingsChanged);
+            FileLog.d("RegionProxyManager: kill switch disabled auto-proxy " + current);
         } catch (Throwable ignore) {
         } finally {
             running = false;
