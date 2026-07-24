@@ -694,6 +694,17 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             items.add(UItem.asShadow(null));
         }
 
+        // Novagram: our own section sits directly under the accounts block — it is the app's headline
+        // feature set, so it comes before Telegram's stock settings rather than below them.
+        items.add(UItem.asHeader("Novagram"));
+        items.add(SettingCell.Factory.of(100, 0xFF7E57C2, 0xFF5E35B1, R.drawable.settings_folders, LanguageCode.INSTANCE.getMyTitles(236)));
+        items.add(SettingCell.Factory.of(105, 0xFF2CBE8C, 0xFF17A06E, R.drawable.msg_bot, LanguageCode.INSTANCE.getMyTitles(344)));
+        items.add(SettingCell.Factory.of(101, 0xFF1BA4ED, 0xFF1488E1, R.drawable.menu_profile_colors, LanguageCode.INSTANCE.getMyTitles(120)));
+        items.add(SettingCell.Factory.of(102, 0xFFC46EF4, 0xFF9F55DF, R.drawable.msg_filled_storageusage, LanguageCode.INSTANCE.getMyTitles(121)));
+        items.add(SettingCell.Factory.of(103, 0xFFF28B31, 0xFFE26314, R.drawable.msg_usersearch, LanguageCode.INSTANCE.getMyTitles(123)));
+        items.add(SettingCell.Factory.of(104, 0xFFF45255, 0xFFDF3955, R.drawable.msg_stats, LanguageCode.INSTANCE.getMyTitles(333)));
+        items.add(UItem.asShadow(null));
+
         items.add(SettingCell.Factory.of(1, IconBackgroundColors.BLUE.top, IconBackgroundColors.BLUE.bottom, R.drawable.settings_account, getString(R.string.SettingsAccount), getString(R.string.SettingsAccountInfo)));
         items.add(SettingCell.Factory.of(2, IconBackgroundColors.ORANGE.top, IconBackgroundColors.ORANGE.bottom, R.drawable.settings_chat, getString(R.string.SettingsChat), getString(R.string.SettingsChatInfo)));
         items.add(SettingCell.Factory.of(3, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.settings_privacy, getString(R.string.SettingsPrivacySecurity), getString(R.string.SettingsPrivacySecurityInfo)));
@@ -704,15 +715,6 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         items.add(SettingCell.Factory.of(9, IconBackgroundColors.ORANGE_DEEP.top, IconBackgroundColors.ORANGE_DEEP.bottom, R.drawable.settings_power, getString(R.string.SettingsPowerSaving), getString(R.string.SettingsPowerSavingInfo)));
         items.add(SettingCell.Factory.of(10, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_language, getString(R.string.SettingsLanguage), LocaleController.getCurrentLanguageName()));
 
-        items.add(UItem.asShadow(null));
-
-        items.add(UItem.asHeader("Novagram"));
-        items.add(SettingCell.Factory.of(100, 0xFF7E57C2, 0xFF5E35B1, R.drawable.settings_folders, LanguageCode.INSTANCE.getMyTitles(236)));
-        items.add(SettingCell.Factory.of(105, 0xFF2CBE8C, 0xFF17A06E, R.drawable.msg_bot, LanguageCode.INSTANCE.getMyTitles(344)));
-        items.add(SettingCell.Factory.of(101, 0xFF1BA4ED, 0xFF1488E1, R.drawable.menu_profile_colors, LanguageCode.INSTANCE.getMyTitles(120)));
-        items.add(SettingCell.Factory.of(102, 0xFFC46EF4, 0xFF9F55DF, R.drawable.msg_filled_storageusage, LanguageCode.INSTANCE.getMyTitles(121)));
-        items.add(SettingCell.Factory.of(103, 0xFFF28B31, 0xFFE26314, R.drawable.msg_usersearch, LanguageCode.INSTANCE.getMyTitles(123)));
-        items.add(SettingCell.Factory.of(104, 0xFFF45255, 0xFFDF3955, R.drawable.msg_stats, LanguageCode.INSTANCE.getMyTitles(333)));
         items.add(UItem.asShadow(null));
 
         if (!getMessagesController().premiumFeaturesBlocked()) {
