@@ -40,6 +40,10 @@ import java.util.concurrent.TimeUnit;
  * Rules that keep this from fighting the user / hurting startup:
  *  - never touches anything if the user already enabled a proxy themselves;
  *  - can be disabled by the user via {@link #PREF_AUTO};
+ *  - once we have auto-applied a proxy and the user then turns it OFF (the switch, deleting the active
+ *    proxy, or dismissing Telegram's "proxy error" dialog), we never re-enable it on later launches
+ *    ({@link #PREF_APPLIED} gate) — otherwise a dead proxy pool would trap the user in a loop where every
+ *    restart puts them back on a proxy stuck at "Connecting…";
  *  - the Remote Config fetch is bounded ({@link #FETCH_TIMEOUT_SECONDS}) so a hanging fetch never
  *    blocks the feature — on timeout we fall back to the last-activated / default values;
  *  - the whole pool is saved to disk ONCE (not per entry), so a 1000-proxy list doesn't jank;
@@ -80,6 +84,15 @@ public final class RegionProxyManager {
         }
         if (prefs.getBoolean("proxy_enabled", false)) {
             return; // a proxy is already active (user's own or ours from a previous run) — leave it
+        }
+        // Novagram: we auto-applied a proxy on an earlier run and it is now OFF. The proxy only turns off
+        // by a deliberate act — the user flipping the switch, deleting the active proxy, or dismissing
+        // Telegram's "proxy error" dialog (nothing auto-writes proxy_enabled=false; ProxyRotationController
+        // only ever sets it true). Re-enabling here would fight the user: a dead proxy pool means proxy
+        // fails → they turn it off → next launch we switch it back on → stuck at "Connecting…". So once our
+        // proxy has been turned off, we leave it off; the user re-enables a proxy by hand if they want one.
+        if (prefs.getBoolean(PREF_APPLIED, false)) {
+            return;
         }
         running = true;
         // Dedicated daemon thread: fetchAndDecide() blocks (bounded) on the Remote Config fetch, so
