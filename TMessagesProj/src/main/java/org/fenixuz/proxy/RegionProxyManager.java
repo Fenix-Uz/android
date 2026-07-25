@@ -18,6 +18,7 @@ import org.telegram.messenger.FileLog;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.SharedConfig;
+import org.telegram.messenger.UserConfig;
 import org.telegram.tgnet.ConnectionsManager;
 
 import java.util.ArrayList;
@@ -59,8 +60,6 @@ public final class RegionProxyManager {
     private static final String RC_KEY = "ru_proxy_list";
     /** Remote Config key: comma-separated ISO country codes to auto-proxy (default "ru"). */
     private static final String RC_REGIONS = "proxy_regions";
-    /** Remote Config key: when true, apply regardless of region — for testing / global rollout. */
-    private static final String RC_FORCE = "proxy_force_all";
     /**
      * Remote Config MASTER permit (default false): auto-proxy does nothing unless the owner sets this to
      * true in the console. A server-delivered {@code false} is also the KILL switch — it tears down a proxy
@@ -77,6 +76,13 @@ public final class RegionProxyManager {
 
     private static final long FETCH_TIMEOUT_SECONDS = 15;
 
+    /** How long the auto-proxy gets to actually connect before we treat the whole pool as dead. */
+    private static final long WATCHDOG_MS = 30_000;
+    /** After a dead-pool disable, how long the user runs direct before auto-proxy may re-attach. */
+    private static final long BACKOFF_MS = 60 * 60 * 1000L;
+    /** Epoch-ms until which auto-proxy stays off after the watchdog found the pool dead. */
+    private static final String PREF_BACKOFF_UNTIL = "novagram_region_proxy_backoff_until";
+
     private static volatile boolean running;
 
     private RegionProxyManager() {
@@ -85,7 +91,7 @@ public final class RegionProxyManager {
     /**
      * Entry point — call once, early in startup. Cheap and safe to call more than once; it no-ops
      * unless the user hasn't set up their own proxy and we're not already working. The real
-     * region/force decision is made after the Remote Config fetch.
+     * region decision is made after the Remote Config fetch.
      */
     public static void maybeAutoConnect() {
         if (running) {
@@ -115,6 +121,12 @@ public final class RegionProxyManager {
         //    master permit (ru_proxy_active) and the region matches;
         //  - proxy ON  & we applied it    → our proxy is up: we still fetch so the remote KILL switch can
         //    reach it and shut it down everywhere at once if our pool goes bad.
+        // Fresh candidate only (here !proxyOn ⟺ off & never-applied): honor the watchdog cooldown. If a
+        // recent launch found the whole pool dead and disabled our proxy, don't re-attach it every restart —
+        // let the user run direct for a while (the pool may be swapped in the console meanwhile).
+        if (!proxyOn && System.currentTimeMillis() < prefs.getLong(PREF_BACKOFF_UNTIL, 0)) {
+            return;
+        }
         running = true;
         // Dedicated daemon thread: fetchAndDecide() blocks (bounded) on the Remote Config fetch, so
         // keep it off both the main thread and the shared dispatch queues.
@@ -130,7 +142,6 @@ public final class RegionProxyManager {
             // Safe in-app defaults so the gate is deterministic even before the first server fetch.
             HashMap<String, Object> defaults = new HashMap<>();
             defaults.put(RC_ACTIVE, false);
-            defaults.put(RC_FORCE, false);
             defaults.put(RC_REGIONS, "ru");
             defaults.put(RC_KEY, "");
             try {
@@ -170,12 +181,15 @@ public final class RegionProxyManager {
                 return;
             }
 
-            boolean force = rc.getBoolean(RC_FORCE);
             ArrayList<String> countries = deviceCountries();
-            boolean allowed = force || regionAllowed(rc.getString(RC_REGIONS), countries);
-            FileLog.d("RegionProxyManager: countries=" + countries + " force=" + force + " allowed=" + allowed);
+            boolean allowed = regionAllowed(rc.getString(RC_REGIONS), countries);
+            FileLog.d("RegionProxyManager: countries=" + countries + " allowed=" + allowed);
             if (!allowed) {
-                running = false;
+                // Not physically in an allowed region (Russia). If a proxy WE auto-applied is still on this
+                // device — e.g. left over from the earlier locale-based check that could misfire on a
+                // Russian-language phone — tear it down so a non-Russian user is never stranded on our proxy.
+                // killOnMain only ever disables our own applied endpoint, never a proxy the user set up.
+                AndroidUtilities.runOnUIThread(RegionProxyManager::killOnMain);
                 return;
             }
             ArrayList<SharedConfig.ProxyInfo> parsed = parseList(rc.getString(RC_KEY));
@@ -190,10 +204,20 @@ public final class RegionProxyManager {
     }
 
     /**
-     * All country signals the device exposes — SIM country, the registered network country (this is the
-     * one that flips to the VISITED country while roaming), and the device region setting. Lower-cased,
-     * de-duplicated, empties dropped. We collect ALL of them (not just the first) so that e.g. a foreign
-     * SIM roaming on a Russian network still counts as "in Russia". Login-free, no permission, offline.
+     * The ONE signal that reflects where the device physically IS right now: the registered-network country
+     * (`getNetworkCountryIso`) — the country of the cell tower the phone is currently camped on, which flips
+     * to the VISITED country while roaming. Lower-cased; empty dropped. Login-free, no permission, offline.
+     *
+     * We deliberately use NOTHING else:
+     *  - NOT the SIM country — a SIM tells you where the number was issued, not where the person is. Someone
+     *    who travels INTO Russia keeps their foreign SIM (so SIM≠ru though they're in Russia and need the
+     *    proxy), while a Russian who travels OUT keeps a Russian SIM (SIM=ru though they're abroad and don't).
+     *    Only the serving network says "physically here now".
+     *  - NOT the locale/region setting — that is a language preference (an Uzbek phone running in Russian
+     *    reports region "RU"), the exact false positive that once wrongly proxied a non-Russian device.
+     *
+     * Cost of this precision: a Wi-Fi-only device with no cellular registration reports no network country, so
+     * we can't confirm Russia and don't attach. That's the safe trade — better to miss than to mis-proxy.
      */
     private static ArrayList<String> deviceCountries() {
         ArrayList<String> out = new ArrayList<>();
@@ -201,13 +225,8 @@ public final class RegionProxyManager {
             Context ctx = ApplicationLoader.applicationContext;
             TelephonyManager tm = ctx == null ? null : (TelephonyManager) ctx.getSystemService(Context.TELEPHONY_SERVICE);
             if (tm != null) {
-                addCountry(out, tm.getSimCountryIso());
                 addCountry(out, tm.getNetworkCountryIso());
             }
-        } catch (Throwable ignore) {
-        }
-        try {
-            addCountry(out, Locale.getDefault().getCountry());
         } catch (Throwable ignore) {
         }
         return out;
@@ -291,6 +310,13 @@ public final class RegionProxyManager {
                         }
                     }
                 }
+                // Our proxy is already on from a previous launch (reaching here means it's ours — a user's own
+                // proxy was filtered out earlier). Re-arm the watchdog so a pool that died between launches
+                // still can't trap the user at "Connecting…" — the case where they'd force-closed before the
+                // first watchdog could fire.
+                if (prefs.getBoolean(PREF_APPLIED, false)) {
+                    AndroidUtilities.runOnUIThread(RegionProxyManager::watchdogCheck, WATCHDOG_MS);
+                }
                 return;
             }
             SharedConfig.loadProxyList();
@@ -344,6 +370,9 @@ public final class RegionProxyManager {
             ConnectionsManager.setProxySettings(true, pick.address, pick.port, pick.username, pick.password, pick.secret);
             NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxySettingsChanged);
             FileLog.d("RegionProxyManager: applied " + pick.address + ":" + pick.port + " (pool=" + SharedConfig.proxyList.size() + ")");
+            // Arm the dead-pool watchdog: if we're still not connected through this proxy in WATCHDOG_MS,
+            // it disables our auto-proxy so the user drops to direct instead of freezing on "Connecting…".
+            AndroidUtilities.runOnUIThread(RegionProxyManager::watchdogCheck, WATCHDOG_MS);
         } catch (Throwable ignore) {
         } finally {
             running = false;
@@ -386,6 +415,54 @@ public final class RegionProxyManager {
         } catch (Throwable ignore) {
         } finally {
             running = false;
+        }
+    }
+
+    /**
+     * Dead-pool watchdog — the safety net that stops a bad pool from trapping a Russian user at
+     * "Connecting to proxy…". {@link #WATCHDOG_MS} after we auto-applied a proxy, if the app STILL has not
+     * connected through it, we disable our auto-proxy so the user drops to a direct connection, and set a
+     * {@link #BACKOFF_MS} cooldown so we don't re-attach the same dead pool on the next launch. Safety rails
+     * mirror the kill switch: acts only while a proxy is enabled, only on the exact endpoint WE applied
+     * (never a user's own proxy), and only when the failure is the proxy's fault — a Connected/Updating state
+     * means it works, and WaitingForNetwork means there's simply no internet (not the proxy) so we leave it.
+     */
+    private static void watchdogCheck() {
+        try {
+            SharedPreferences prefs = MessagesController.getGlobalMainSettings();
+            if (!prefs.getBoolean("proxy_enabled", false)) {
+                return; // already disabled (user or kill switch)
+            }
+            if (!prefs.getBoolean(PREF_APPLIED, false)) {
+                return; // the active proxy is the user's own — never touch it
+            }
+            String applied = prefs.getString(PREF_APPLIED_ENDPOINT, "");
+            String current = prefs.getString("proxy_ip", "") + ":" + prefs.getInt("proxy_port", 0);
+            if (TextUtils.isEmpty(applied) || !applied.equals(current)) {
+                return; // the user switched to a different proxy since we applied — leave it alone
+            }
+            int state = ConnectionsManager.getInstance(UserConfig.selectedAccount).getConnectionState();
+            if (state == ConnectionsManager.ConnectionStateConnected
+                    || state == ConnectionsManager.ConnectionStateUpdating
+                    || state == ConnectionsManager.ConnectionStateWaitingForNetwork) {
+                return; // proxy works, or there is no network at all — not a dead-pool situation
+            }
+            // Still stuck connecting through the proxy after the grace period → treat the pool as dead.
+            prefs.edit()
+                    .putBoolean("proxy_enabled", false)
+                    .putBoolean("proxy_enabled_calls", false)
+                    .putBoolean(PREF_APPLIED, false)
+                    .remove(PREF_APPLIED_ENDPOINT)
+                    .putLong(PREF_BACKOFF_UNTIL, System.currentTimeMillis() + BACKOFF_MS)
+                    .apply();
+            if (SharedConfig.proxyRotationEnabled) {
+                SharedConfig.proxyRotationEnabled = false;
+                SharedConfig.saveConfig();
+            }
+            ConnectionsManager.setProxySettings(false, "", 0, "", "", "");
+            NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.proxySettingsChanged);
+            FileLog.d("RegionProxyManager: watchdog — pool dead (state=" + state + "), disabled auto-proxy + backing off " + current);
+        } catch (Throwable ignore) {
         }
     }
 
