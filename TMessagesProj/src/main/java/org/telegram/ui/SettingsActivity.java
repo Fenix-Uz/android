@@ -703,6 +703,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         items.add(SettingCell.Factory.of(102, 0xFFC46EF4, 0xFF9F55DF, R.drawable.msg_filled_storageusage, LanguageCode.INSTANCE.getMyTitles(121)));
         items.add(SettingCell.Factory.of(103, 0xFFF28B31, 0xFFE26314, R.drawable.msg_usersearch, LanguageCode.INSTANCE.getMyTitles(123)));
         items.add(SettingCell.Factory.of(104, 0xFFF45255, 0xFFDF3955, R.drawable.msg_stats, LanguageCode.INSTANCE.getMyTitles(333)));
+        items.add(SettingCell.Factory.of(106, 0xFF1FB0A5, 0xFF12968C, R.drawable.msg_info, LanguageCode.INSTANCE.getMyTitles(355)));
         items.add(UItem.asShadow(null));
 
         items.add(SettingCell.Factory.of(1, IconBackgroundColors.BLUE.top, IconBackgroundColors.BLUE.bottom, R.drawable.settings_account, getString(R.string.SettingsAccount), getString(R.string.SettingsAccountInfo)));
@@ -915,6 +916,9 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 break;
             case 104:
                 presentFragment(new org.fenixuz.ui.analytics_screen.AnalyticsScreen());
+                break;
+            case 106:
+                presentFragment(new org.fenixuz.ui.about.AboutScreen());
                 break;
         }
     }
