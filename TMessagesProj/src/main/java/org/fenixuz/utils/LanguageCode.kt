@@ -1734,6 +1734,8 @@ object LanguageCode {
         titlesLanguages.add(TitleLanguages(367, "Founded 2022", "2022-yilda tashkil topgan", "Основана в 2022 году"))
         titlesLanguages.add(TitleLanguages(368, "Republic of Uzbekistan", "O'zbekiston Respublikasi", "Республика Узбекистан"))
         titlesLanguages.add(TitleLanguages(369, "Leave a review on RuStore", "RuStore'da sharh qoldiring", "Оставьте отзыв в RuStore"))
+        titlesLanguages.add(TitleLanguages(370, "Novagram website", "Novagram sayti", "Сайт Novagram"))
+        titlesLanguages.add(TitleLanguages(371, "Company website", "Kompaniya sayti", "Сайт компании"))
     }
 
     init {

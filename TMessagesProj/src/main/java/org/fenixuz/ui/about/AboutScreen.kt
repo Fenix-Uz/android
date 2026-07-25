@@ -239,16 +239,21 @@ class AboutScreen : BaseFragment() {
         })
         card.addView(block)
 
+        // Each row now leads with a plain-language label (what it is) and shows the address underneath, so a
+        // user knows what they'll open before tapping — not a bare "novagram.org" whose meaning is unclear.
         card.addView(divider(context))
-        card.addView(row(context, R.drawable.msg_link, 0xFFC46EF4.toInt(), "vipads.uz", null) {
-            Browser.openUrl(context, "https://vipads.uz")
-        })
-        card.addView(divider(context))
-        card.addView(row(context, R.drawable.msg_link, 0xFF1BA4ED.toInt(), "novagram.org", null) {
+        card.addView(row(context, R.drawable.msg_link, 0xFF1BA4ED.toInt(),
+                LanguageCode.getMyTitles(370), "novagram.org") {          // Novagram website
             Browser.openUrl(context, "https://novagram.org")
         })
         card.addView(divider(context))
-        card.addView(row(context, R.drawable.msg_message, 0xFFF28B31.toInt(), COMPANY_EMAIL, null) {
+        card.addView(row(context, R.drawable.msg_link, 0xFFC46EF4.toInt(),
+                LanguageCode.getMyTitles(371), "vipads.uz") {             // Company website
+            Browser.openUrl(context, "https://vipads.uz")
+        })
+        card.addView(divider(context))
+        card.addView(row(context, R.drawable.msg_message, 0xFFF28B31.toInt(),
+                LanguageCode.getMyTitles(363), COMPANY_EMAIL) {           // Email
             openEmail(context)
         })
         return card
