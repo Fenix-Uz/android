@@ -19,7 +19,9 @@ object EditMessage {
     // across all chats. It NEVER resets to empty — once the cap is exceeded only the single oldest
     // entry rolls off per save. Bounds prefs growth so the storage queue never does O(history) work
     // per edit. Just a constant — raising it later needs no migration (the JSON format is unchanged).
-    private const val MAX_ENTRIES = 5000
+    // Kept lower than mark_delete's cap (20000) on purpose: each entry carries the FULL pre-edit message
+    // text (up to ~4 KB), so this store's blob lives in the shared "db" prefs and must stay modest.
+    private const val MAX_ENTRIES = 10000
 
     private var sharedPreferences =
         ApplicationLoader.applicationContext.getSharedPreferences("db", Context.MODE_PRIVATE)

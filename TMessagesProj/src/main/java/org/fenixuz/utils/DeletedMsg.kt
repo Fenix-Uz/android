@@ -28,7 +28,9 @@ object DeletedMsg {
     // across all chats. It NEVER resets to empty — once the cap is exceeded only the single oldest
     // entry rolls off per save. Bounds prefs growth so the storage queue never does unbounded work.
     // Just a constant — raising it later needs no migration (the JSON format is unchanged).
-    private const val MAX_ENTRIES = 5000
+    // Sized high (20000) because each entry is tiny (dialogId + id + who ≈ 60 bytes ⇒ ~1.2 MB full),
+    // unlike edited_messages which stores full message text and is capped lower.
+    private const val MAX_ENTRIES = 20000
 
     private val sharedPreferences =
         ApplicationLoader.applicationContext.getSharedPreferences("db", Context.MODE_PRIVATE)
