@@ -428,6 +428,13 @@ public class ApplicationLoader extends Application {
                 org.fenixuz.utils.DeletedMsg.INSTANCE.warmUp();
                 org.fenixuz.utils.EditMessage.INSTANCE.warmUp();
             } catch (Throwable ignore) {
+            } finally {
+                // Cache is now warm: tell any open chat to re-render cells bound during the cold-cache window
+                // so a saved "deleted" mark that was briefly missing reappears. postNotificationName must run
+                // on the main thread; the finally runs even on a partial warm-up failure (the handler is a
+                // safe no-op if the cache is still cold — whoDelete() then returns "" and nothing changes).
+                AndroidUtilities.runOnUIThread(() ->
+                    NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.novagramHistoryWarmedUp));
             }
         }, "novagram-history-warmup");
         historyWarmup.setDaemon(true);

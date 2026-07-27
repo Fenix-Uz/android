@@ -2885,6 +2885,7 @@ public class ChatActivity extends BaseFragment implements
         NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.didSetNewWallpapper);
         NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.didApplyNewTheme);
         NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.goingToPreviewTheme);
+        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.novagramHistoryWarmedUp);
         getNotificationCenter().addObserver(this, NotificationCenter.channelRightsUpdated);
         getNotificationCenter().addObserver(this, NotificationCenter.audioRecordTooShort);
         getNotificationCenter().addObserver(this, NotificationCenter.didUpdateReactions);
@@ -3425,6 +3426,7 @@ public class ChatActivity extends BaseFragment implements
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.didSetNewWallpapper);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.didApplyNewTheme);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.goingToPreviewTheme);
+        NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.novagramHistoryWarmedUp);
         getNotificationCenter().removeObserver(this, NotificationCenter.channelRightsUpdated);
         getNotificationCenter().removeObserver(this, NotificationCenter.updateMentionsCount);
         getNotificationCenter().removeObserver(this, NotificationCenter.audioRecordTooShort);
@@ -20343,8 +20345,46 @@ public class ChatActivity extends BaseFragment implements
         }
     }
 
+    // Novagram delete-save: restore the "deleted" mark on cells that were bound while the mark_delete cache
+    // was still warming up in the background (see NotificationCenter.novagramHistoryWarmedUp). The mark is
+    // normally re-derived from the cache when a cell binds (setMessageObject site below), but cells already
+    // on screen before the cache warmed show nothing. Here we re-render ONLY the visible cells that lack a
+    // mark the now-warm cache has — off-screen rows self-heal on their next bind. We update cells directly
+    // instead of calling RecyclerView.notify* (which can crash during a layout pass), and only ever ADD a
+    // missing mark, so this is idempotent and safe to run at any time. This produces exactly what a natural
+    // re-bind would: getMessageObject() returns the very object forceResetMessageObject() re-renders, so the
+    // mark can never land on the wrong (pending-bind) object, and the empty-check leaves live marks untouched.
+    private void fenixRefreshDeletedMarks() {
+        if (chatListView == null) {
+            return;
+        }
+        for (int i = 0; i < chatListView.getChildCount(); i++) {
+            View child = chatListView.getChildAt(i);
+            if (!(child instanceof ChatMessageCell)) {
+                continue;
+            }
+            ChatMessageCell cell = (ChatMessageCell) child;
+            MessageObject msg = cell.getMessageObject();
+            if (msg == null || msg.messageOwner == null) {
+                continue;
+            }
+            if (msg.deletedBy != null && !msg.deletedBy.isEmpty()) {
+                continue;
+            }
+            String mark = DeletedMsg.INSTANCE.whoDelete(dialog_id, msg.messageOwner.id);
+            if (mark != null && !mark.isEmpty()) {
+                msg.deletedBy = mark;
+                cell.forceResetMessageObject();
+            }
+        }
+    }
+
     @Override
     public void didReceivedNotification(int id, int account, final Object... args) {
+        if (id == NotificationCenter.novagramHistoryWarmedUp) {
+            fenixRefreshDeletedMarks();
+            return;
+        }
         if (id == NotificationCenter.messagesDidLoad) {
             int guid = (Integer) args[10];
             if (guid != classGuid) {

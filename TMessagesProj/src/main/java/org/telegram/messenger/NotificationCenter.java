@@ -378,6 +378,10 @@ public class NotificationCenter {
     public static final int tlSchemeParseException = totalEvents++;
     public static final int callTabsVisibleToggled = totalEvents++;
     public static final int contactsPermissionBadgeCheck = totalEvents++;
+    // Novagram: fired (on the global instance, main thread) once the delete-save/edit-save history caches
+    // have finished warming up in the background. An open chat uses it to re-render cells that were bound
+    // during the cold-cache window, so a saved "deleted" mark that was briefly missing reappears.
+    public static final int novagramHistoryWarmedUp = totalEvents++;
 
     public static boolean alreadyLogged;
 
