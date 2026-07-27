@@ -22,7 +22,9 @@
         <item name="android:colorPrimary">#232d3a</item>
         <item name="android:navigationBarColor">#000000</item>
         <item name="android:forceDarkAllowed">false</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <!-- Padded brand disc, not the full-bleed launcher foreground — avoids the square-on-splash on OEMs
+             that don't circle-mask the splash icon. -->
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/splash_icon</item>
         <item name="android:windowSplashScreenAnimationDuration">@integer/splash_screen_duration</item>
         <item name="android:windowSplashScreenBackground">#1f2732</item>
     </style>

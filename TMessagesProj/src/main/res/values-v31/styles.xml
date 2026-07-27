@@ -28,7 +28,10 @@
         <item name="android:navigationBarColor">#000000</item>
         <item name="android:textViewStyle">@style/MyTextViewStyle</item>
         <item name="android:forceDarkAllowed">false</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <!-- Dedicated splash icon: brand disc + white N, centred with transparent padding (Google keyline).
+             NOT the full-bleed launcher foreground — that rendered as a plain square on OEMs that don't
+             circle-mask the splash. This padded disc looks identical whether the OEM masks it or not. -->
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/splash_icon</item>
         <item name="android:windowSplashScreenAnimationDuration">@integer/splash_screen_duration</item>
         <item name="android:windowSplashScreenBackground">?android:windowBackground</item>
     </style>

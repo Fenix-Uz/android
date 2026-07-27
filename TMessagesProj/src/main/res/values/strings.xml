@@ -5620,11 +5620,11 @@
     <string name="BioLimitSubtitle">Add more symbols and use links in your bio.</string>
     <string name="AppIcon">App Icon</string>
     <string name="AppIconDefault">Default</string>
-    <string name="AppIconAmethyst">Amethyst</string>
-    <string name="AppIconEmerald">Emerald</string>
-    <string name="AppIconCrimson">Crimson</string>
-    <string name="AppIconMint">Mint</string>
-    <string name="AppIconViolet">Violet</string>
+    <string name="AppIconAmethyst">Purple</string>
+    <string name="AppIconEmerald">Teal</string>
+    <string name="AppIconCrimson">Red</string>
+    <string name="AppIconMint">Orange</string>
+    <string name="AppIconViolet">Pink</string>
     <string name="AppIconVintage">Vintage</string>
     <string name="AppIconAqua">Aqua</string>
     <string name="AppIconPremium">Premium</string>
