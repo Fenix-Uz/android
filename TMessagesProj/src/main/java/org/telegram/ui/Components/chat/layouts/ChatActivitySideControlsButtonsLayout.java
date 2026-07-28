@@ -255,6 +255,11 @@ public class ChatActivitySideControlsButtonsLayout extends FrameLayout implement
         return buttonHolders[buttonId];
     }
 
+    @Override
+    public boolean hasOverlappingRendering() {
+        return false;
+    }
+
     private static class ButtonHolder {
         public final ChatActivityBlurredRoundPageDownButton button;
         public final BoolAnimator visibilityAnimator;

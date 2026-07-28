@@ -187,6 +187,7 @@ import org.telegram.ui.Components.blur3.source.BlurredBackgroundSource;
 import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceColor;
 import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode;
 import org.telegram.ui.Components.chat.ViewPositionWatcher;
+import org.telegram.ui.Components.chat.layouts.ChatActivitySideControlsButtonsLayout;
 import org.telegram.ui.Components.voip.CellFlickerDrawable;
 import org.telegram.ui.DialogsActivity;
 import org.telegram.ui.EmojiAnimationsOverlay;
@@ -324,6 +325,7 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
     private PaidReactionButton starsButton;
     private MuteButton muteButton;
     ChatActivityEnterView chatActivityEnterView;
+    ChatActivitySideControlsButtonsLayout sideControlsButtonsLayout;
     HintView2 highlightMessageHintView;
     private ValueAnimator changeBoundAnimator;
     ReactionsContainerLayout reactionsContainerLayout;
@@ -1187,6 +1189,7 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
         shareButton.setOnClickListener(v -> {
             shareStory(true);
         });
+        shareButton.setContentDescription(getString(R.string.ShareFile));
         ScaleStateListAnimator.apply(shareButton);
 
         if (!DISABLE_STORY_REPOSTING) {
@@ -1326,12 +1329,14 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
         optionsIconView.setImageDrawable(sharedResources.optionsDrawable);
         optionsIconView.setPadding(dp(8), dp(8), dp(8), dp(8));
         optionsIconView.setBackground(Theme.createSelectorDrawable(Color.WHITE));
+        optionsIconView.setContentDescription(getString(R.string.AccDescrMoreOptions));
         storyContainer.addView(optionsIconView, LayoutHelper.createFrame(40, 40, Gravity.RIGHT | Gravity.TOP, 2, 15, 2, 0));
 
         pipIconView = new ImageView(context);
         pipIconView.setImageDrawable(sharedResources.pipDrawable);
         pipIconView.setPadding(dp(8), dp(8), dp(8), dp(8));
         pipIconView.setBackground(Theme.createSelectorDrawable(Color.WHITE));
+        pipIconView.setContentDescription(getString(R.string.AccDescrPipMode));
         storyContainer.addView(pipIconView, LayoutHelper.createFrame(40, 40, Gravity.RIGHT | Gravity.TOP, 2, 15, 2 + 40, 0));
         pipIconView.setOnClickListener(v -> {
             if (storyViewer != null) {
@@ -2325,6 +2330,7 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
                 if (storyViewer.soundEnabled()) {
                     MessagesController.getGlobalMainSettings().edit().putInt("taptostorysoundhint", 3).apply();
                 }
+                muteIconContainer.setContentDescription(getString(storyViewer.soundEnabled() ? R.string.Mute : R.string.Unmute));
             } else {
                 showNoSoundHint(true);
             }
@@ -2649,11 +2655,13 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
                 counterChanged = true;
             }
             storiesLikeButton.setReaction(null);
+            likeButtonContainer.setContentDescription(getString(R.string.AccDescrLike));
         } else {
             if (!hasReactionOld) {
                 counterChanged = true;
             }
             storiesLikeButton.setReaction(ReactionsLayoutInBubble.VisibleReaction.fromTL(currentStory.storyItem.sent_reaction));
+            likeButtonContainer.setContentDescription(getString(R.string.AccDescrLiked));
             try {
                 performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
             } catch (Exception ignored) {}
@@ -3646,7 +3654,19 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
             chatActivityEnterView.setVisibility(View.GONE);
         }
 
+        sideControlsButtonsLayout = new ChatActivitySideControlsButtonsLayout(getContext(), resourcesProvider, blurredBackgroundColorProvider, blurredBackgroundDrawableFactory);
+        sideControlsButtonsLayout.setOnClickListener(this::onSideControlButtonOnClick);
+        addView(sideControlsButtonsLayout, LayoutHelper.createFrame(57, 300, Gravity.RIGHT | Gravity.BOTTOM));
+        sideControlsButtonsLayout.setVisibility(View.GONE);
+        chatActivityEnterView.setSideButtonsForAttach(sideControlsButtonsLayout);
+
         reactionsContainerIndex = getChildCount();
+    }
+
+    private void onSideControlButtonOnClick(int buttonId, View view) {
+        if (buttonId == ChatActivitySideControlsButtonsLayout.BUTTON_ATTACH) {
+            openAttachMenu();
+        }
     }
 
     private void createMentionsContainer() {
@@ -5469,6 +5489,9 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
                 bottomActionsLinearLayout.setVisibility(isBotsPreview() ? View.GONE : View.VISIBLE);
             }
         }
+        if (sideControlsButtonsLayout != null) {
+            sideControlsButtonsLayout.setVisibility(chatActivityEnterView != null && chatActivityEnterView.getVisibility() == View.VISIBLE && !currentStory.isLive ? View.VISIBLE : View.GONE);
+        }
         if (commentButton != null) {
             commentButton.setVisibility(!unsupported && currentStory.isLive ? View.VISIBLE : View.GONE);
             commentButton.setCollapsed(liveCommentsView.isCollapsed(), false);
@@ -5567,9 +5590,11 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
             if (currentStory.hasSound()) {
                 muteIconView.setVisibility(View.VISIBLE);
                 noSoundIconView.setVisibility(View.GONE);
+                muteIconContainer.setContentDescription(getString(storyViewer.soundEnabled() ? R.string.Mute : R.string.Unmute));
             } else {
                 muteIconView.setVisibility(View.GONE);
                 noSoundIconView.setVisibility(View.VISIBLE);
+                muteIconContainer.setContentDescription(getString(R.string.NoSound));
             }
             muteIconContainer.setAlpha(muteIconViewAlpha * (1f - outT));
         } else {
@@ -7561,6 +7586,10 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
                     translationY -= chatActivityEnterView.getMeasuredHeight() - chatActivityEnterView.getAnimatedTop();
                     alpha = progressToKeyboard;
                     child.invalidate();
+                }
+                if (child == sideControlsButtonsLayout) {
+                    translationY -= chatActivityEnterView.getMeasuredHeight() - chatActivityEnterView.getAnimatedTop();
+                    alpha *= progressToKeyboard;
                 }
                 if (child == reactionsContainerLayout) {
                     float finalProgress = progressToKeyboard * (1f - progressToRecording.get()) * (1f - progressToStickerExpandedLocal) * (1f - progressToTextA.get());
