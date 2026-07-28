@@ -8,16 +8,21 @@
 
 package org.telegram.ui.Components;
 
-public class Point {
+public class RectOld {
+
     public float x;
     public float y;
+    public float width;
+    public float height;
 
-    public Point() {
+    public RectOld() {
 
     }
 
-    public Point(float x, float y) {
+    public RectOld(float x, float y, float width, float height) {
         this.x = x;
         this.y = y;
+        this.width = width;
+        this.height = height;
     }
 }

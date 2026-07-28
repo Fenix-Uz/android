@@ -100,7 +100,13 @@ import java.util.List;
 import java.util.Locale;
 
 public class BotWebViewAttachedSheet implements NotificationCenter.NotificationCenterDelegate, BaseFragment.AttachedSheet, BottomSheetTabsOverlay.Sheet {
-    public final static int TYPE_WEB_VIEW_BUTTON = 0, TYPE_SIMPLE_WEB_VIEW_BUTTON = 1, TYPE_BOT_MENU_BUTTON = 2, TYPE_WEB_VIEW_BOT_APP = 3, TYPE_WEB_VIEW_BOT_MAIN = 4;
+    public final static int
+            TYPE_WEB_VIEW_BUTTON = 0,
+            TYPE_SIMPLE_WEB_VIEW_BUTTON = 1,
+            TYPE_BOT_MENU_BUTTON = 2,
+            TYPE_WEB_VIEW_BOT_APP = 3,
+            TYPE_WEB_VIEW_BOT_MAIN = 4,
+            TYPE_WEB_VIEW_GUARD = 5;
 
     public final static int FLAG_FROM_INLINE_SWITCH = 1;
     public final static int FLAG_FROM_SIDE_MENU = 2;
@@ -147,7 +153,8 @@ public class BotWebViewAttachedSheet implements NotificationCenter.NotificationC
             TYPE_SIMPLE_WEB_VIEW_BUTTON,
             TYPE_BOT_MENU_BUTTON,
             TYPE_WEB_VIEW_BOT_APP,
-            TYPE_WEB_VIEW_BOT_MAIN
+            TYPE_WEB_VIEW_BOT_MAIN,
+            TYPE_WEB_VIEW_GUARD
     })
     public @interface WebViewType {}
 
@@ -1234,7 +1241,7 @@ public class BotWebViewAttachedSheet implements NotificationCenter.NotificationC
                     req.platform = "android";
                     req.bot = MessagesController.getInstance(currentAccount).getInputUser(props.botId);
                     req.peer = fragment instanceof ChatActivity ? ((ChatActivity) fragment).getCurrentUser() != null ? MessagesController.getInputPeer(((ChatActivity) fragment).getCurrentUser()) : MessagesController.getInputPeer(((ChatActivity) fragment).getCurrentChat())
-                            : MessagesController.getInputPeer(props.botUser);
+                            : MessagesController.getInstance(currentAccount).getInputPeer(props.peerId);
                     req.compact = props.compact;
                     req.fullscreen = props.fullscreen;
 
@@ -1301,7 +1308,7 @@ public class BotWebViewAttachedSheet implements NotificationCenter.NotificationC
             if (user != null && user.photo != null) {
                 File f = FileLoader.getInstance(currentAccount).getPathToAttach(user.photo.photo_small, true);
                 if (!f.exists()) {
-                    MediaDataController.getInstance(currentAccount).preloadImage(ImageLocation.getForUser(user, ImageLocation.TYPE_SMALL), FileLoader.PRIORITY_LOW);
+                    MediaDataController.getInstance(currentAccount).preloadImage(ImageLocation.getForUser(currentAccount, user, ImageLocation.TYPE_SMALL), FileLoader.PRIORITY_LOW);
                 }
             }
         }
@@ -1700,7 +1707,7 @@ public class BotWebViewAttachedSheet implements NotificationCenter.NotificationC
 
             clipPath.rewind();
             float radius = dp(16) * (AndroidUtilities.isTablet() ? 1f : 1f - actionBarTransitionProgress);
-            final float r = lerp(radius, dp(10), progress);
+            final float r = lerp(radius, dp(18), progress);
             rect.set(clipRect);
             if (opening) {
                 rect.top -= dp(16) * (1f - actionBarTransitionProgress);
@@ -1894,7 +1901,7 @@ public class BotWebViewAttachedSheet implements NotificationCenter.NotificationC
         if (userFull == null) return false;
         if (userFull.bot_info == null) return false;
         if (userFull.bot_info.privacy_policy_url != null) return true;
-        for (TLRPC.TL_botCommand command : userFull.bot_info.commands) {
+        for (TLRPC.BotCommand command : userFull.bot_info.commands) {
             if ("privacy".equals(command.command)) {
                 return true;
             }

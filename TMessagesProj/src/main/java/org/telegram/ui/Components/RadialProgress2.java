@@ -162,6 +162,10 @@ public class RadialProgress2 {
         overlayImageView.setImage(url, url != null ? String.format(Locale.US, "%d_%d", circleRadius * 2, circleRadius * 2) : null, null, null, -1);
     }
 
+    public void setImageOverlay(Bitmap bitmap) {
+        overlayImageView.setImageBitmap(bitmap);
+    }
+
     public void onAttachedToWindow() {
         overlayImageView.onAttachedToWindow();
     }
@@ -254,10 +258,12 @@ public class RadialProgress2 {
             return;
         }
         mediaActionDrawable.setIcon(icon, animated);
-        if (!animated) {
-            parent.invalidate();
-        } else {
-            invalidateParent();
+        if (parent != null) {
+            if (!animated) {
+                parent.invalidate();
+            } else {
+                invalidateParent();
+            }
         }
     }
 

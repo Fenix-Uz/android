@@ -26,7 +26,7 @@ import org.telegram.ui.Components.RecyclerListView;
 import org.telegram.ui.Components.StorageDiagramView;
 import org.telegram.ui.Storage.CacheModel;
 
-public class DilogCacheBottomSheet extends BottomSheetWithRecyclerListView {
+public class DialogCacheBottomSheet extends BottomSheetWithRecyclerListView {
 
     private final StorageDiagramView circleDiagramView;
     CacheControlActivity.DialogFileEntities entities;
@@ -103,7 +103,7 @@ public class DilogCacheBottomSheet extends BottomSheetWithRecyclerListView {
         return false;
     }
 
-    public DilogCacheBottomSheet(CacheControlActivity baseFragment, CacheControlActivity.DialogFileEntities entities, CacheModel cacheModel, Delegate delegate) {
+    public DialogCacheBottomSheet(CacheControlActivity baseFragment, CacheControlActivity.DialogFileEntities entities, CacheModel cacheModel, Delegate delegate) {
         super(baseFragment, false, false, !cacheModel.isEmpty(), null);
         this.cacheDelegate = delegate;
         this.entities = entities;
@@ -237,7 +237,7 @@ public class DilogCacheBottomSheet extends BottomSheetWithRecyclerListView {
 
             @Override
             public void dismiss() {
-                DilogCacheBottomSheet.this.dismiss();
+                DialogCacheBottomSheet.this.dismiss();
             }
 
             @Override

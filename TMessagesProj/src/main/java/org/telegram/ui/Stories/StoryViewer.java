@@ -64,6 +64,7 @@ import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
+import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
@@ -1786,7 +1787,7 @@ public class StoryViewer implements NotificationCenter.NotificationCenterDelegat
 
         if (ATTACH_TO_FRAGMENT) {
             AndroidUtilities.removeFromParent(windowView);
-            windowView.setTag(0xFF112233, new Object());
+            windowView.setTag(R.id.sheet_attached_to_fragment_tag, new Object());
             fragment.getLayoutContainer().addView(windowView);
             if (!ATTACHED_FRAGMENT_IS_EDGE_TO_EDGE) {
                 AndroidUtilities.requestAdjustResize(fragment.getParentActivity(), fragment.getClassGuid());
@@ -2098,7 +2099,18 @@ public class StoryViewer implements NotificationCenter.NotificationCenterDelegat
             }
         }
         if (placeProvider != null) {
-            placeProvider.preLayout(storiesViewPager.getCurrentDialogId(), messageId, () -> {
+            long preLayoutDid = storiesViewPager.getCurrentDialogId();
+            int preLayoutMessageId = messageId;
+            if (storiesList instanceof StoriesController.StoryRepostsList) {
+                final PeerStoriesView peerView = storiesViewPager.getCurrentPeerView();
+                int position = peerView == null ? 0 : peerView.getSelectedPosition();
+                TL_stories.StoryItem si = peerView == null || position < 0 || position >= peerView.storyItems.size() ? null : peerView.storyItems.get(position);
+                if (si != null) {
+                    preLayoutDid = si.dialogId;
+                    preLayoutMessageId = si.id;
+                }
+            }
+            placeProvider.preLayout(preLayoutDid, preLayoutMessageId, () -> {
                 updateTransitionParams();
                 if (transitionViewHolder.avatarImage != null) {
                     transitionViewHolder.avatarImage.setVisible(false, true);
@@ -2130,6 +2142,9 @@ public class StoryViewer implements NotificationCenter.NotificationCenterDelegat
             if (storiesList instanceof StoriesController.SearchStoriesList && storyItem != null) {
                 did = storyItem.dialogId;
                 storyId = storyItem.messageId;
+            } else if (storiesList instanceof StoriesController.StoryRepostsList && storyItem != null) {
+                did = storyItem.dialogId;
+                storyId = storyItem.id;
             } else if (storiesList != null) {
                 storyId = dayStoryId;
             }
@@ -2589,6 +2604,9 @@ public class StoryViewer implements NotificationCenter.NotificationCenterDelegat
                     if (currentPlayerScope != null) {
                         currentPlayerScope.invalidate();
                     }
+                    if (surfaceView != null) {
+                        surfaceView.setVisibility(View.INVISIBLE);
+                    }
                     release();
                     try {
                         AndroidUtilities.runOnUIThread(() -> {
@@ -2617,10 +2635,8 @@ public class StoryViewer implements NotificationCenter.NotificationCenterDelegat
                     }
                 }
             });
-            openCloseAnimator.setDuration(400);
+            openCloseAnimator.setDuration(320);
             openCloseAnimator.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
-//            openCloseAnimator.setDuration(2000);
-//            openCloseAnimator.setInterpolator(CubicBezierInterpolator.DEFAULT);
             openCloseAnimator.start();
         }, 16);
     }
