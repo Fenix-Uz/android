@@ -485,7 +485,7 @@ class SecretLockScreen(
             }
         }
         backgroundAnimationSpring?.addUpdateListener { _: DynamicAnimation<*>?, _: Float, _: Float ->
-            motionBackgroundDrawable.updateAnimation(true)
+            motionBackgroundDrawable.updateAnimation()
         }
         backgroundAnimationSpring?.start()
     }

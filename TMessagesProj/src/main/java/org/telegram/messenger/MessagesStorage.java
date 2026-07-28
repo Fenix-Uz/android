@@ -14953,6 +14953,17 @@ public class MessagesStorage extends BaseController {
         executeInStorageQueue(() -> updateDialogsWithDeletedMessagesInternal(dialogId, channelId, messages, additionalDialogsToUpdate));
     }
 
+    // Fenix delete-save: 12.6.3 had a useQueue overload that upstream dropped in the executeInStorageQueue
+    // refactor; our callers (and DeletedMsg) still pass it, so keep this overload for source compatibility
+    // (queue when true, run inline when false — same semantics as before the re-base).
+    public void updateDialogsWithDeletedMessages(long dialogId, long channelId, ArrayList<Integer> messages, ArrayList<Long> additionalDialogsToUpdate, boolean useQueue) {
+        if (useQueue) {
+            storageQueue.postRunnable(() -> updateDialogsWithDeletedMessagesInternal(dialogId, channelId, messages, additionalDialogsToUpdate));
+        } else {
+            updateDialogsWithDeletedMessagesInternal(dialogId, channelId, messages, additionalDialogsToUpdate);
+        }
+    }
+
     public ArrayList<Long> markMessagesAsDeleted(long dialogId, ArrayList<Integer> messages, boolean useQueue, boolean deleteFiles, int mode, int topicId) {
         if (messages.isEmpty()) {
             return null;

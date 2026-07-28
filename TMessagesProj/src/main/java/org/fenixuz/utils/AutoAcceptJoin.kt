@@ -6,6 +6,7 @@ import org.telegram.messenger.ChatObject
 import org.telegram.messenger.MessagesController
 import org.telegram.tgnet.ConnectionsManager
 import org.telegram.tgnet.TLRPC
+import org.telegram.tgnet.tl.TL_update
 
 /**
  * Novagram: global toggle that AUTO-ACCEPTS incoming join requests in channels/groups you manage.
@@ -59,7 +60,7 @@ object AutoAcceptJoin {
      * Hooked from MessagesController.processUpdateArray for every pending-join-requests update.
      * No-op (one volatile read) when the toggle is off.
      */
-    fun maybeAccept(account: Int, update: TLRPC.TL_updatePendingJoinRequests) {
+    fun maybeAccept(account: Int, update: TL_update.TL_updatePendingJoinRequests) {
         if (!isEnabled()) return
         if (update.requests_pending <= 0) return
         val peer = update.peer ?: return
