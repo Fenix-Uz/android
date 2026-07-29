@@ -2440,7 +2440,10 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                         newMsg.media_unread = true;
                     }
                 }
-                if (replyToTopMsg == null && suggestionParams == null && msgObj.messageOwner.reply_to != null) {
+                // fenixuz: in hide-sender / "special forward" (copy) mode, do NOT carry over the reply link.
+                // Otherwise, forwarding a batch where one message replies to another selected message would
+                // re-attach the replied-to message as an embedded reply-quote, leaking it into the clean copy.
+                if (!forwardFromMyName && replyToTopMsg == null && suggestionParams == null && msgObj.messageOwner.reply_to != null) {
                     if (
                         !(msgObj.messageOwner.reply_to.reply_to_peer_id == null || MessageObject.peersEqual(msgObj.messageOwner.reply_to.reply_to_peer_id, msgObj.messageOwner.peer_id)) ||
                         ids != null && (msgObj.messageOwner.reply_to.flags & 16) != 0 && ids.contains(msgObj.messageOwner.reply_to.reply_to_msg_id)
@@ -2470,7 +2473,9 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                 arr.add(newMsg);
                 StarsController.getInstance(currentAccount).beforeSendingMessage(newMsgObj);
 
-                if (msgObj.replyMessageObject != null) {
+                // fenixuz: skip the local reply-quote attachment too in hide-sender / "special forward" mode,
+                // so the copied message renders without the embedded replied-to message.
+                if (!forwardFromMyName && msgObj.replyMessageObject != null) {
                     for (int i = 0; i < messages.size(); i++) {
                         if (messages.get(i).getId() == msgObj.replyMessageObject.getId()) {
                             newMsgObj.messageOwner.replyMessage = msgObj.replyMessageObject.messageOwner;
