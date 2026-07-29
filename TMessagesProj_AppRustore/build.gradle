@@ -166,7 +166,7 @@ def getRustoreVersionCode() {
 
 def getRustoreVersionName() {
     def v = getRustoreProp("RUSTORE_VERSION_NAME")
-    return (v == null || v.toString().trim().isEmpty()) ? "12.6.4" : v.toString().trim()
+    return (v == null || v.toString().trim().isEmpty()) ? "12.9.0" : v.toString().trim()
 }
 
 apply plugin: 'com.google.gms.google-services'
