@@ -44,6 +44,7 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.biometric.BiometricPrompt.PromptInfo
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.dynamicanimation.animation.DynamicAnimation
 import androidx.dynamicanimation.animation.FloatValueHolder
 import androidx.dynamicanimation.animation.SpringAnimation
@@ -98,7 +99,10 @@ class SecretLockScreen(
     override fun didReceivedNotification(id: Int, account: Int, vararg args: Any) {
         if (id == NotificationCenter.didGenerateFingerprintKeyPair) {
             checkFingerprintButton()
-            if (args[0] as Boolean && SharedConfig.appLocked) {
+            // Auto-pop the prompt once the AndroidKeyStore key finishes generating, gated on THIS lock
+            // screen being visible — NOT SharedConfig.appLocked, which is the app-wide passcode flag and is
+            // false for a per-chat lock (so the very first unlock would otherwise never auto-prompt).
+            if (args[0] as Boolean && visibility == VISIBLE) {
                 checkFingerprint()
             }
         } else if (id == NotificationCenter.passcodeDismissed) {
@@ -734,7 +738,13 @@ class SecretLockScreen(
                     FingerprintController.isKeyReady() && !FingerprintController.checkDeviceFingerprintsChanged()
                 ) {
                     val executor = ContextCompat.getMainExecutor(context)
-                    val prompt = BiometricPrompt(LaunchActivity.instance, executor,
+                    // Host the prompt on the activity that actually shows this lock dialog, not the static
+                    // LaunchActivity.instance: after a process restart / config change that static ref can
+                    // point at a stale or finishing activity, so authenticate() attaches to the wrong
+                    // FragmentManager and the system prompt silently never appears. Fall back to the static
+                    // instance only if the cast fails (keeps the previous behaviour as a safety net).
+                    val host = (parentActivity as? FragmentActivity) ?: LaunchActivity.instance ?: return
+                    val prompt = BiometricPrompt(host, executor,
                         object : BiometricPrompt.AuthenticationCallback() {
                             override fun onAuthenticationError(errMsgId: Int, errString: CharSequence) {
                                 FileLog.d("SecretLockScreen onAuthenticationError $errMsgId \"$errString\"")
@@ -757,7 +767,10 @@ class SecretLockScreen(
                         .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
                         .build()
                     prompt.authenticate(promptInfo)
-                    showPin(false)
+                    // Keep the PIN pad VISIBLE behind the biometric prompt — the same clean look as the very
+                    // first auto-prompt — so tapping the fingerprint key again never tears the pad down into
+                    // an overlapping lock-icon + title state. (Previously showPin(false) faded it away and, if
+                    // the prompt paused the activity mid-fade, it froze half-hidden and looked broken.)
                 }
             } catch (e: Exception) {
                 FileLog.e(e)
