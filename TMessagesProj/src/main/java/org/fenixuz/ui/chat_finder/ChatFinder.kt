@@ -159,7 +159,7 @@ class ChatFinder : BaseFragment() {
         val color = if (available) Theme.getColor(Theme.key_featuredStickers_addButton)
         else Theme.getColor(Theme.key_picker_disabledButton)
         btn.background = Theme.createSimpleSelectorRoundRectDrawable(
-            AndroidUtilities.dp(8f), color,
+            AndroidUtilities.dp(16f), color,
             Theme.getColor(Theme.key_featuredStickers_addButtonPressed)
         )
         btn.isEnabled = available
