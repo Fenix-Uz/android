@@ -5,7 +5,6 @@ import android.content.Intent
 import android.graphics.Outline
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
-import android.os.Build
 import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
@@ -411,9 +410,8 @@ class AboutScreen : BaseFragment() {
 
     private fun appVersion(context: Context): String {
         return try {
-            val pi = context.packageManager.getPackageInfo(context.packageName, 0)
-            val code = if (Build.VERSION.SDK_INT >= 28) pi.longVersionCode else pi.versionCode.toLong()
-            "${pi.versionName} ($code)"
+            // Only the version name is user-facing here; the build/version code is intentionally omitted.
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: ""
         } catch (e: Exception) {
             ""
         }
