@@ -72,7 +72,10 @@ object SecretPassword {
     /** Adapts this store to the shared lock screen. */
     fun credential(): LockCredential = object : LockCredential {
         override val type: Int? get() = getPassword()?.type
-        override val fingerPrint: Boolean get() = getPassword()?.fingerPrint ?: false
+        // Biometric unlock is automatic, same as the per-chat lock: offered whenever the device supports
+        // strong biometrics (the passcode always remains as the fallback). Previously this read the stored
+        // per-setup flag, which stayed false, so the secret folder never showed fingerprint at all.
+        override val fingerPrint: Boolean get() = org.fenixuz.utils.Password.isFingerprintHardwareAvailable()
         override fun check(input: String): Boolean = checkPassword(input)
     }
 
