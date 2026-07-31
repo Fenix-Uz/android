@@ -268,6 +268,14 @@ class AboutScreen : BaseFragment() {
             cornerRadius = dp(18).toFloat()
             setColor(Theme.getColor(Theme.key_windowBackgroundWhite))
         }
+        // Clip children to the card's rounded shape so a row's rectangular ripple can't bleed past the
+        // corners on the top/bottom rows — the corner-overflow users reported.
+        outlineProvider = object : ViewOutlineProvider() {
+            override fun getOutline(view: View, outline: Outline) {
+                outline.setRoundRect(0, 0, view.width, view.height, dp(18).toFloat())
+            }
+        }
+        clipToOutline = true
     }
 
     private fun spacedCard() =
