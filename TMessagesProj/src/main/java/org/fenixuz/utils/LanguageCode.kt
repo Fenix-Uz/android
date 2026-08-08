@@ -1736,6 +1736,7 @@ object LanguageCode {
         titlesLanguages.add(TitleLanguages(369, "Leave a review on RuStore", "RuStore'da sharh qoldiring", "Оставьте отзыв в RuStore"))
         titlesLanguages.add(TitleLanguages(370, "Novagram website", "Novagram sayti", "Сайт Novagram"))
         titlesLanguages.add(TitleLanguages(371, "Company website", "Kompaniya sayti", "Сайт компании"))
+        titlesLanguages.add(TitleLanguages(372, "No secret chats", "Yashirin chatlar yo'q", "Нет секретных чатов"))
     }
 
     init {

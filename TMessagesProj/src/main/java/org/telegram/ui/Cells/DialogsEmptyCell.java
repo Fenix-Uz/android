@@ -46,7 +46,8 @@ public class DialogsEmptyCell extends LinearLayout {
     public final static int TYPE_WELCOME_NO_CONTACTS = 0,
         TYPE_WELCOME_WITH_CONTACTS = 1,
         TYPE_FILTER_NO_CHATS_TO_DISPLAY = 2,
-        TYPE_FILTER_ADDING_CHATS = 3;
+        TYPE_FILTER_ADDING_CHATS = 3,
+        TYPE_SECRET_NO_CHATS = 4; // Novagram: empty state for the passcode-locked secret folder.
     private final static int TYPE_UNSPECIFIED = -1;
 
     @Retention(RetentionPolicy.SOURCE)
@@ -55,7 +56,8 @@ public class DialogsEmptyCell extends LinearLayout {
             TYPE_WELCOME_NO_CONTACTS,
             TYPE_WELCOME_WITH_CONTACTS,
             TYPE_FILTER_NO_CHATS_TO_DISPLAY,
-            TYPE_FILTER_ADDING_CHATS
+            TYPE_FILTER_ADDING_CHATS,
+            TYPE_SECRET_NO_CHATS
     })
     public @interface EmptyType {}
 
@@ -131,12 +133,26 @@ public class DialogsEmptyCell extends LinearLayout {
         currentType = value;
         String help;
         int icon;
+        // dp — the duck/illustration render size AND the view size (kept equal for a 1:1, non-scaled draw).
+        // Defaults to 100 for every type; bumped for the secret folder. Reset each call so a recycled cell
+        // switching back to another type returns to 100.
+        int iconSize = 100;
         switch (currentType) {
             case TYPE_WELCOME_WITH_CONTACTS:
             case TYPE_WELCOME_NO_CONTACTS:
                 icon = R.raw.utyan_newborn;
                 help = LocaleController.getString(R.string.NoChatsHelp);
                 titleView.setText(LocaleController.getString(R.string.NoChats));
+                break;
+            case TYPE_SECRET_NO_CHATS:
+                // Novagram: the "searching" duck (Utyan with a magnifying glass) + our own title, no subtitle.
+                // Auto-repeat so it keeps animating while the empty folder is open. The welcome/contacts
+                // machinery in DialogsAdapter is skipped for this folder, so the cell just shows on its own.
+                imageView.setAutoRepeat(true);
+                icon = R.raw.utyan_empty;
+                iconSize = 120;
+                titleView.setText(org.fenixuz.utils.LanguageCode.INSTANCE.getMyTitles(372));
+                help = "";
                 break;
             case TYPE_FILTER_NO_CHATS_TO_DISPLAY:
                 imageView.setAutoRepeat(false);
@@ -172,8 +188,17 @@ public class DialogsEmptyCell extends LinearLayout {
                     startUtyanCollapseAnimation(true);
                 }
             }
+            // Keep the view box the same size as the rasterised lottie (dp → density-independent) so the duck
+            // is never up/down-scaled or clipped by the CENTER scale type, on any screen density.
+            final int iconSizePx = AndroidUtilities.dp(iconSize);
+            final android.view.ViewGroup.LayoutParams lp = imageView.getLayoutParams();
+            if (lp != null && lp.width != iconSizePx) {
+                lp.width = iconSizePx;
+                lp.height = iconSizePx;
+                imageView.setLayoutParams(lp);
+            }
             if (prevIcon != icon) {
-                imageView.setAnimation(icon, 100, 100);
+                imageView.setAnimation(icon, iconSize, iconSize);
                 imageView.playAnimation();
                 prevIcon = icon;
             }
@@ -275,7 +300,7 @@ public class DialogsEmptyCell extends LinearLayout {
                 offset -= getTop() / 2;
             }
         }
-        if (currentType == TYPE_WELCOME_NO_CONTACTS || currentType == TYPE_WELCOME_WITH_CONTACTS) {
+        if (currentType == TYPE_WELCOME_NO_CONTACTS || currentType == TYPE_WELCOME_WITH_CONTACTS || currentType == TYPE_SECRET_NO_CHATS) {
             offset -= (int) ((ActionBar.getCurrentActionBarHeight() / 2f) * (1f - utyanCollapseProgress));
         }
         imageView.setTranslationY(offset);
@@ -300,7 +325,7 @@ public class DialogsEmptyCell extends LinearLayout {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        if (currentType == TYPE_WELCOME_NO_CONTACTS || currentType == TYPE_WELCOME_WITH_CONTACTS) {
+        if (currentType == TYPE_WELCOME_NO_CONTACTS || currentType == TYPE_WELCOME_WITH_CONTACTS || currentType == TYPE_SECRET_NO_CHATS) {
             super.onMeasure(MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(measureUtyanHeight(heightMeasureSpec), MeasureSpec.EXACTLY));
         } else if (currentType == TYPE_FILTER_NO_CHATS_TO_DISPLAY || currentType == TYPE_FILTER_ADDING_CHATS) {
             int totalHeight;
