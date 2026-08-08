@@ -1737,6 +1737,8 @@ object LanguageCode {
         titlesLanguages.add(TitleLanguages(370, "Novagram website", "Novagram sayti", "Сайт Novagram"))
         titlesLanguages.add(TitleLanguages(371, "Company website", "Kompaniya sayti", "Сайт компании"))
         titlesLanguages.add(TitleLanguages(372, "No secret chats", "Yashirin chatlar yo'q", "Нет секретных чатов"))
+        titlesLanguages.add(TitleLanguages(373, "Not a stranger", "Begona emas", "Не незнакомец"))
+        titlesLanguages.add(TitleLanguages(374, "No stranger chats", "Begona suhbatlar yo'q", "Нет чужих чатов"))
     }
 
     init {

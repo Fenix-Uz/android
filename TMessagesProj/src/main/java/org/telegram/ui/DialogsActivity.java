@@ -597,6 +597,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private ActionBarMenuSubItem blockItem;
     @Nullable
     private ActionBarMenuSubItem secretChatItem;
+    @Nullable
+    private ActionBarMenuSubItem strangerTrustItem;
     public SecretLockScreenDialog secretLockScreenDialog = null;
 
     private float additionalFloatingTranslation;
@@ -727,6 +729,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private final static int secret_chat = 111;
     // Novagram: upstream's community_ungroup also claimed 111; moved to 112 to coexist with our secret_chat.
     private final static int community_ungroup = 112;
+    // Novagram: "Not a stranger" — move selected chats out of the Stranger inbox back to the main list.
+    private final static int stranger_trust = 113;
 
     private final static int ARCHIVE_ITEM_STATE_PINNED = 0;
     private final static int ARCHIVE_ITEM_STATE_SHOWED = 1;
@@ -4046,7 +4050,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         undoView.showWithAction(did, UndoView.ACTION_REMOVED_FROM_FOLDER, neverShow.size(), filter, null, null);
                     }
                     hideActionMode(false);
-                } else if (id == pin || id == read || id == delete || id == clear || id == mute || id == archive || id == block || id == archive2 || id == pin2 || id == secret_chat) {
+                } else if (id == pin || id == read || id == delete || id == clear || id == mute || id == archive || id == block || id == archive2 || id == pin2 || id == secret_chat || id == stranger_trust) {
                     performSelectedDialogsAction(selectedDialogs, id, true, false);
                 }
             }
@@ -6800,6 +6804,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         blockItem = otherItem.addSubItem(block, R.drawable.msg_block, LocaleController.getString(R.string.BlockUser));
         secretChatItem = otherItem.addSubItem(secret_chat, R.drawable.msg_secret, org.fenixuz.utils.LanguageCode.INSTANCE.getMyTitles(215));
         secretChatItem.setVisibility(View.GONE);
+        // Novagram: only shown in the Stranger inbox — moves selected chats back to the main list.
+        strangerTrustItem = otherItem.addSubItem(stranger_trust, R.drawable.msg_contacts, org.fenixuz.utils.LanguageCode.INSTANCE.getMyTitles(373));
+        strangerTrustItem.setVisibility(View.GONE);
 
         muteItem.setOnLongClickListener(e -> {
             performSelectedDialogsAction(selectedDialogs, mute, true, true);
@@ -9393,6 +9400,20 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             getMessagesController().addDialogToFolder(copy, toSecret ? SecretPassword.SECRET_FOLDER_ID : 0, -1, null, 0);
             hideActionMode(false);
             return;
+        } else if (action == stranger_trust) {
+            // Novagram: move the selected chats out of the Stranger inbox back to the main list. Multi-select
+            // works naturally — every selected id is trusted (whitelisted) at once.
+            ArrayList<Long> copy = new ArrayList<>(selectedDialogs);
+            for (int i = 0; i < copy.size(); i++) {
+                org.fenixuz.utils.StrangerShield.trust(currentAccount, copy.get(i));
+            }
+            // Trusted chats now count toward the main "Chats" badge again — recompute it once.
+            MessagesStorage.getInstance(currentAccount).fenixRecalcMainUnread();
+            // Same signal the shield toggle uses: rebuild the lists so the chats leave the inbox and reappear
+            // in the main list immediately.
+            getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
+            hideActionMode(false);
+            return;
         } else if ((action == pin || action == pin2) && canPinCount != 0) {
             int pinnedCount = 0;
             int pinnedSecretCount = 0;
@@ -10146,6 +10167,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             } else {
                 secretChatItem.setVisibility(View.GONE);
             }
+        }
+        if (strangerTrustItem != null) {
+            // Only meaningful inside the "Stranger chats" inbox; hidden everywhere else.
+            strangerTrustItem.setVisibility(fenixStrangerInbox ? View.VISIBLE : View.GONE);
         }
         if (removeFromFolderItem != null) {
             boolean cantRemoveFromFolder = filterTabsView == null || filterTabsView.getVisibility() != View.VISIBLE || filterTabsView.currentTabIsDefault();

@@ -43,6 +43,7 @@ object StrangerShield {
     private const val PREF = "db"
     private const val KEY = "stranger_shield"
     private const val KEY_CAPTURED_PREFIX = "stranger_captured_"
+    private const val KEY_ALLOWED_PREFIX = "stranger_allowed_"
     // Old single global set (pre per-account). Migrated into account 0 once, then removed.
     private const val KEY_CAPTURED_LEGACY = "stranger_captured"
 
@@ -55,10 +56,16 @@ object StrangerShield {
     // (notifications/badge), written from both → a lock-free concurrent set per account.
     private val captured = Array(UserConfig.MAX_ACCOUNT_COUNT) { ConcurrentHashMap.newKeySet<Long>() }
 
+    // Per-account whitelist: strangers the user explicitly moved back to the main list ("Not a stranger").
+    // Overrides BOTH the shield and the captured set, so a trusted stranger stays in the main list even
+    // while the shield is on and even though they are not a contact. Same lock-free per-account shape.
+    private val allowed = Array(UserConfig.MAX_ACCOUNT_COUNT) { ConcurrentHashMap.newKeySet<Long>() }
+
     private fun prefs(): SharedPreferences =
         ApplicationLoader.applicationContext.getSharedPreferences(PREF, Context.MODE_PRIVATE)
 
     private fun keyFor(account: Int) = KEY_CAPTURED_PREFIX + account
+    private fun keyForAllowed(account: Int) = KEY_ALLOWED_PREFIX + account
 
     private fun ensureLoaded() {
         if (loaded) return
@@ -70,6 +77,10 @@ object StrangerShield {
                 val raw = p.getString(keyFor(a), "") ?: ""
                 if (raw.isNotEmpty()) {
                     for (s in raw.split(',')) s.toLongOrNull()?.let { captured[a].add(it) }
+                }
+                val rawAllowed = p.getString(keyForAllowed(a), "") ?: ""
+                if (rawAllowed.isNotEmpty()) {
+                    for (s in rawAllowed.split(',')) s.toLongOrNull()?.let { allowed[a].add(it) }
                 }
             }
             // One-time migration of the old global set → account 0 (ids are account-scoped now).
@@ -99,13 +110,19 @@ object StrangerShield {
         for (a in 0 until UserConfig.MAX_ACCOUNT_COUNT) {
             if (!UserConfig.getInstance(a).isClientActivated) continue
             if (value) {
+                // Re-arming protection is a fresh start: forget the previous "Not a stranger" whitelist so
+                // every current stranger — INCLUDING ones the user let out last time — is filed again. (This
+                // only runs on a real OFF→ON toggle; without a re-toggle the whitelist stays and trusted
+                // chats never return.)
+                clearAllowed(a)
                 // Turning ON: file every current stranger into the inbox, and clear any
                 // notification/app-badge they already accumulated.
                 captureCurrentStrangers(a)
                 NotificationsController.getInstance(a).fenixDismissStrangers()
             }
-            // Drop ids that are no longer strangers / no longer exist — keeps the set bounded.
+            // Drop ids that are no longer strangers / no longer exist — keeps both sets bounded.
             pruneCaptured(a)
+            pruneAllowed(a)
             // Recompute the bottom "Chats" tab badge (drops strangers on, restores non-captured off).
             MessagesStorage.getInstance(a).fenixRecalcMainUnread()
         }
@@ -132,13 +149,19 @@ object StrangerShield {
     @JvmStatic
     fun belongsInInbox(account: Int, user: TLRPC.User?, dialogId: Long): Boolean {
         if (!isStranger(user)) return false
+        if (allowed[account].contains(dialogId)) return false   // explicitly trusted → always in main list
         return isEnabled() || captured[account].contains(dialogId)
     }
 
-    /** File a stranger into [account]'s inbox (called while the shield is on). Idempotent, async-saved. */
+    /**
+     * File a stranger into [account]'s inbox (called while the shield is on). Idempotent, async-saved.
+     * A trusted (whitelisted) id is never re-filed — otherwise the render hot-path would keep re-capturing
+     * a stranger the user just moved out.
+     */
     @JvmStatic
     fun capture(account: Int, dialogId: Long) {
         ensureLoaded()
+        if (allowed[account].contains(dialogId)) return
         if (captured[account].add(dialogId)) saveCaptured(account)
     }
 
@@ -152,6 +175,54 @@ object StrangerShield {
         prefs().edit().putString(keyFor(account), captured[account].joinToString(",")).apply()
     }
 
+    /**
+     * Move a stranger OUT of the inbox back to the main list ("Not a stranger"): whitelist the id (so it
+     * stays out even while the shield is on) and drop it from the captured set. Device-only, async-saved.
+     * The caller refreshes the dialog list (dialogsNeedReload) and the main badge after moving one or more.
+     */
+    @JvmStatic
+    fun trust(account: Int, dialogId: Long) {
+        ensureLoaded()
+        if (allowed[account].add(dialogId)) saveAllowed(account)
+        if (captured[account].remove(dialogId)) saveCaptured(account)
+    }
+
+    private fun saveAllowed(account: Int) {
+        prefs().edit().putString(keyForAllowed(account), allowed[account].joinToString(",")).apply()
+    }
+
+    /** Forget every "Not a stranger" whitelist entry for [account] (called when protection is re-armed). */
+    private fun clearAllowed(account: Int) {
+        if (allowed[account].isEmpty()) return
+        allowed[account].clear()
+        saveAllowed(account)
+    }
+
+    /** Same bounding as [pruneCaptured]: drop whitelisted ids that became contacts or whose dialog is gone. */
+    private fun pruneAllowed(account: Int) {
+        val set = allowed[account]
+        if (set.isEmpty()) return
+        try {
+            val mc = MessagesController.getInstance(account)
+            var changed = false
+            val it = set.iterator()
+            while (it.hasNext()) {
+                val id = it.next()
+                val user = mc.getUser(id)
+                if (user != null) {
+                    if (!isStranger(user)) {
+                        it.remove(); changed = true
+                    }
+                } else if (mc.dialogs_dict.get(id) == null) {
+                    it.remove(); changed = true
+                }
+            }
+            if (changed) saveAllowed(account)
+        } catch (e: Exception) {
+            FileLog.e(e)
+        }
+    }
+
     /** Snapshot every current stranger dialog into [account]'s set (called when the shield turns on). */
     private fun captureCurrentStrangers(account: Int) {
         try {
@@ -159,7 +230,8 @@ object StrangerShield {
             val set = captured[account]
             var changed = false
             for (d in ArrayList(mc.allDialogs)) {
-                if (d != null && DialogObject.isUserDialog(d.id) && isStranger(mc.getUser(d.id))) {
+                if (d != null && DialogObject.isUserDialog(d.id) && isStranger(mc.getUser(d.id))
+                        && !allowed[account].contains(d.id)) {
                     if (set.add(d.id)) changed = true
                 }
             }

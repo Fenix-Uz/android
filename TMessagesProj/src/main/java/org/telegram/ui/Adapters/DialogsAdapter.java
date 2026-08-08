@@ -887,6 +887,8 @@ public class DialogsAdapter extends RecyclerListView.SelectionAdapter implements
             return DialogsEmptyCell.TYPE_FILTER_NO_CHATS_TO_DISPLAY;
         } else if (folderId == org.fenixuz.ui.secret_chat.SecretPassword.SECRET_FOLDER_ID) {
             return DialogsEmptyCell.TYPE_SECRET_NO_CHATS;
+        } else if (parentFragment != null && parentFragment.isFenixStrangerInbox()) {
+            return DialogsEmptyCell.TYPE_STRANGER_NO_CHATS;
         } else {
             return onlineContacts != null ? DialogsEmptyCell.TYPE_WELCOME_WITH_CONTACTS : DialogsEmptyCell.TYPE_WELCOME_NO_CONTACTS;
         }
@@ -1041,7 +1043,8 @@ public class DialogsAdapter extends RecyclerListView.SelectionAdapter implements
                 // Novagram: the secret folder's empty cell is static — skip the welcome/contacts machinery
                 // (utyan animation, contacts alpha, scroll-disable) which is meant only for the main list and
                 // would otherwise leave scrolling disabled after a chat is added back to the folder.
-                if (dialogsType != 7 && dialogsType != 8 && folderId != org.fenixuz.ui.secret_chat.SecretPassword.SECRET_FOLDER_ID) {
+                if (dialogsType != 7 && dialogsType != 8 && folderId != org.fenixuz.ui.secret_chat.SecretPassword.SECRET_FOLDER_ID
+                        && !(parentFragment != null && parentFragment.isFenixStrangerInbox())) {
                     cell.setOnUtyanAnimationEndListener(() -> parentFragment.setScrollDisabled(false));
                     cell.setOnUtyanAnimationUpdateListener(progress -> parentFragment.setContactsAlpha(progress));
                     if (!cell.isUtyanAnimationTriggered() && dialogsCount == 0) {
@@ -1673,6 +1676,12 @@ public class DialogsAdapter extends RecyclerListView.SelectionAdapter implements
             isEmpty = true;
             // The empty cell already measures to the full viewport height (see DialogsEmptyCell), so it needs
             // no trailing spacer — a LAST_EMPTY here would just add an empty scroll region below the duck.
+            itemInternals.add(new ItemInternal(VIEW_TYPE_EMPTY, dialogsEmptyType()));
+            return;
+        }
+        // Novagram: the "Stranger chats" inbox shows the same duck empty view when it has no chats.
+        if (dialogsCount == 0 && fenixStrangerInbox) {
+            isEmpty = true;
             itemInternals.add(new ItemInternal(VIEW_TYPE_EMPTY, dialogsEmptyType()));
             return;
         }

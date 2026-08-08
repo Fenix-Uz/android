@@ -47,7 +47,8 @@ public class DialogsEmptyCell extends LinearLayout {
         TYPE_WELCOME_WITH_CONTACTS = 1,
         TYPE_FILTER_NO_CHATS_TO_DISPLAY = 2,
         TYPE_FILTER_ADDING_CHATS = 3,
-        TYPE_SECRET_NO_CHATS = 4; // Novagram: empty state for the passcode-locked secret folder.
+        TYPE_SECRET_NO_CHATS = 4,    // Novagram: empty state for the passcode-locked secret folder.
+        TYPE_STRANGER_NO_CHATS = 5;  // Novagram: empty state for the "Stranger chats" inbox.
     private final static int TYPE_UNSPECIFIED = -1;
 
     @Retention(RetentionPolicy.SOURCE)
@@ -57,7 +58,8 @@ public class DialogsEmptyCell extends LinearLayout {
             TYPE_WELCOME_WITH_CONTACTS,
             TYPE_FILTER_NO_CHATS_TO_DISPLAY,
             TYPE_FILTER_ADDING_CHATS,
-            TYPE_SECRET_NO_CHATS
+            TYPE_SECRET_NO_CHATS,
+            TYPE_STRANGER_NO_CHATS
     })
     public @interface EmptyType {}
 
@@ -145,13 +147,15 @@ public class DialogsEmptyCell extends LinearLayout {
                 titleView.setText(LocaleController.getString(R.string.NoChats));
                 break;
             case TYPE_SECRET_NO_CHATS:
+            case TYPE_STRANGER_NO_CHATS:
                 // Novagram: the "searching" duck (Utyan with a magnifying glass) + our own title, no subtitle.
-                // Auto-repeat so it keeps animating while the empty folder is open. The welcome/contacts
-                // machinery in DialogsAdapter is skipped for this folder, so the cell just shows on its own.
+                // Auto-repeat so it keeps animating while the empty screen is open. The welcome/contacts
+                // machinery in DialogsAdapter is skipped for these, so the cell just shows on its own.
                 imageView.setAutoRepeat(true);
                 icon = R.raw.utyan_empty;
                 iconSize = 120;
-                titleView.setText(org.fenixuz.utils.LanguageCode.INSTANCE.getMyTitles(372));
+                titleView.setText(org.fenixuz.utils.LanguageCode.INSTANCE.getMyTitles(
+                        currentType == TYPE_SECRET_NO_CHATS ? 372 : 374));
                 help = "";
                 break;
             case TYPE_FILTER_NO_CHATS_TO_DISPLAY:
@@ -300,7 +304,7 @@ public class DialogsEmptyCell extends LinearLayout {
                 offset -= getTop() / 2;
             }
         }
-        if (currentType == TYPE_WELCOME_NO_CONTACTS || currentType == TYPE_WELCOME_WITH_CONTACTS || currentType == TYPE_SECRET_NO_CHATS) {
+        if (currentType == TYPE_WELCOME_NO_CONTACTS || currentType == TYPE_WELCOME_WITH_CONTACTS || currentType == TYPE_SECRET_NO_CHATS || currentType == TYPE_STRANGER_NO_CHATS) {
             offset -= (int) ((ActionBar.getCurrentActionBarHeight() / 2f) * (1f - utyanCollapseProgress));
         }
         imageView.setTranslationY(offset);
@@ -325,7 +329,7 @@ public class DialogsEmptyCell extends LinearLayout {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        if (currentType == TYPE_WELCOME_NO_CONTACTS || currentType == TYPE_WELCOME_WITH_CONTACTS || currentType == TYPE_SECRET_NO_CHATS) {
+        if (currentType == TYPE_WELCOME_NO_CONTACTS || currentType == TYPE_WELCOME_WITH_CONTACTS || currentType == TYPE_SECRET_NO_CHATS || currentType == TYPE_STRANGER_NO_CHATS) {
             super.onMeasure(MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(measureUtyanHeight(heightMeasureSpec), MeasureSpec.EXACTLY));
         } else if (currentType == TYPE_FILTER_NO_CHATS_TO_DISPLAY || currentType == TYPE_FILTER_ADDING_CHATS) {
             int totalHeight;
