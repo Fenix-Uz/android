@@ -1824,7 +1824,12 @@ public class DialogsAdapter extends RecyclerListView.SelectionAdapter implements
                 }
             }
 
-            if (communityId == 0 && !forceShowEmptyCell && dialogsType != 7 && dialogsType != 8 && !MessagesController.getInstance(currentAccount).isDialogsEndReached(folderId)) {
+            // Novagram: the secret folder (100) is a synthetic local folder — the server never paginates it,
+            // so isDialogsEndReached(100) stays false forever and the bottom loading shimmer would spin
+            // endlessly once it has any chat. Treat it as always end-reached: no flicker.
+            if (communityId == 0 && !forceShowEmptyCell && dialogsType != 7 && dialogsType != 8
+                    && folderId != org.fenixuz.ui.secret_chat.SecretPassword.SECRET_FOLDER_ID
+                    && !MessagesController.getInstance(currentAccount).isDialogsEndReached(folderId)) {
                 if (dialogsCount != 0) {
                     itemInternals.add(new ItemInternal(VIEW_TYPE_FLICKER));
                 }
