@@ -9358,6 +9358,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 if (toSecret) {
                     final long secretDid = copy.get(i);
                     SecretPassword.INSTANCE.addSecret(secretDid);
+                    // The chat is secret now — pull any notification it already posted out of the shade too,
+                    // so it goes silent immediately, not only for future messages.
+                    getNotificationsController().removeNotificationsForDialog(secretDid);
                     // Purge the chat from search recents completely so a now-secret chat leaves no trace
                     // and never reappears there. Two parts: (1) in-memory removal when the search UI is
                     // loaded (immediate), and (2) an UNCONDITIONAL delete of the persistent search_recent

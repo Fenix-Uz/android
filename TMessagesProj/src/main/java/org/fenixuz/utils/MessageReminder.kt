@@ -14,6 +14,7 @@ import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import org.fenixuz.ui.secret_chat.SecretPassword
 import org.telegram.messenger.AndroidUtilities
 import org.telegram.messenger.ApplicationLoader
 import org.telegram.messenger.DialogObject
@@ -234,7 +235,10 @@ object MessageReminder {
     private fun hasIncoming(messages: List<MessageObject>?): Boolean {
         if (messages == null) return false
         for (m in messages) {
-            if (!m.isOut && DialogObject.isUserDialog(m.dialogId)) return true
+            // Secret-folder chats never notify (see the NotificationsController guard), so they must not
+            // arm the unread reminder either — otherwise a locked chat would still ring after the delay.
+            if (!m.isOut && DialogObject.isUserDialog(m.dialogId)
+                && !SecretPassword.isSecret(m.dialogId)) return true
         }
         return false
     }

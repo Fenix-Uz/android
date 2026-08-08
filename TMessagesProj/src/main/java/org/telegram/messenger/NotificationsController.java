@@ -1065,6 +1065,14 @@ public class NotificationsController extends BaseController implements Notificat
 
             for (int a = 0; a < messageObjects.size(); a++) {
                 MessageObject messageObject = messageObjects.get(a);
+                // Novagram: never notify for chats the user moved into the secret (passcode-locked) folder.
+                // Skipping here keeps the message out of pushMessages entirely, so every downstream path —
+                // heads-up, the shade, the in-app popup, the summary count — stays clean. Taking the chat back
+                // out of the folder restores normal notifications automatically (its id leaves the secret set).
+                if (messageObject != null && messageObject.messageOwner != null
+                        && org.fenixuz.ui.secret_chat.SecretPassword.INSTANCE.isSecret(messageObject.getDialogId())) {
+                    continue;
+                }
                 if (messageObject.messageOwner != null && (messageObject.isImportedForward() ||
                         messageObject.messageOwner.action instanceof TLRPC.TL_messageActionSetMessagesTTL ||
                         messageObject.messageOwner.silent && (messageObject.messageOwner.action instanceof TLRPC.TL_messageActionContactSignUp || messageObject.messageOwner.action instanceof TLRPC.TL_messageActionUserJoined)) ||
