@@ -364,6 +364,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
 
     private boolean muteVideo;
     private boolean sendAsRoundVideo; // Novagram: current video will be sent as a round video note
+    private float roundVideoPixelWidthHeightRatio = 1f; // Novagram: source pixel aspect (SAR) for the round crop
 
     private boolean isUnalivePhoto() {
         if (sendPhotoType == SELECT_TYPE_STICKER) return true;
@@ -10124,18 +10125,26 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             // square is always valid and even (H.264 requires even dimensions — fixVideoWidthHeight enforces it).
             final int ow = Math.max(1, originalWidth);
             final int oh = Math.max(1, originalHeight);
+            // Novagram fix: build the centered square in DISPLAY space, correcting for a non-square pixel
+            // aspect (SAR / pixelWidthHeightRatio). Some devices' gallery videos store non-square pixels
+            // (e.g. 720x480 shown as 16:9); cropping a square of the RAW pixels then stretched the note on
+            // exactly those devices. When SAR == 1 (the vast majority, incl. the dev phone) dispW/dispH equal
+            // ow/oh, so the crop fractions + size are byte-identical to before — no regression for working videos.
+            final float sar = roundVideoPixelWidthHeightRatio > 0 ? roundVideoPixelWidthHeightRatio : 1f;
+            final float dispW = ow * sar;
+            final float dispH = oh;
             MediaController.CropState crop = new MediaController.CropState();
             crop.cropScale = 1f;
             crop.cropPx = 0f;
             crop.cropPy = 0f;
-            if (ow >= oh) {
-                crop.cropPw = oh / (float) ow;
+            if (dispW >= dispH) {
+                crop.cropPw = dispH / dispW;
                 crop.cropPh = 1f;
             } else {
                 crop.cropPw = 1f;
-                crop.cropPh = ow / (float) oh;
+                crop.cropPh = dispW / dispH;
             }
-            final int target = Math.min(512, Math.min(ow, oh));
+            final int target = Math.min(512, Math.max(2, Math.round(Math.min(dispW, dispH))));
             final int[] roundSize = fixVideoWidthHeight(target, target);
             crop.transformWidth = roundSize[0];
             crop.transformHeight = roundSize[1];
@@ -10839,6 +10848,9 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
 
                 @Override
                 public void onVideoSizeChanged(int width, int height, int unappliedRotationDegrees, float pixelWidthHeightRatio) {
+                    // Novagram: remember the pixel aspect ratio (SAR) so the round-video square crop can be
+                    // computed in display space, not raw-pixel space (fixes stretch on non-square-pixel videos).
+                    roundVideoPixelWidthHeightRatio = pixelWidthHeightRatio > 0 ? pixelWidthHeightRatio : 1f;
                     if (aspectRatioFrameLayout != null) {
                         if (unappliedRotationDegrees == 90 || unappliedRotationDegrees == 270) {
                             int temp = width;
@@ -21980,6 +21992,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
 
         compressionsCount = -1;
         rotationValue = 0;
+        roundVideoPixelWidthHeightRatio = 1f; // reset per video; onVideoSizeChanged sets the real SAR
         videoFramerate = 25;
         File file = new File(videoPath);
         originalSize = file.length();
