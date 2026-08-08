@@ -85,6 +85,9 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
     // Novagram: our own sponsored label (e.g. shown on the ads promo channel row). Reuses the exact
     // same pill as Telegram's native ad label, but carries our text and has no options ("i") menu.
     private CharSequence customAdLabel;
+    // Novagram: when true, [customAdLabel] is ignored and the pill renders identically to Telegram's native
+    // ad label (localized "Ad" + info icon), so a TELEGRAM-platform ad is indistinguishable from a real one.
+    private boolean customAdNative;
 
     private TLRPC.User user;
     private TLRPC.Chat chat;
@@ -214,16 +217,33 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
         ad = sponsoredPeer;
     }
 
-    /** Novagram: show our own sponsored pill with [label] (pass null to clear). */
-    public void setCustomAd(CharSequence label) {
-        if (!TextUtils.equals(customAdLabel, label)) {
+    /**
+     * Novagram: show our own sponsored pill (pass null + false to clear). When [nativeStyle] is true the pill
+     * shows the localized "Ad" text and [label] is ignored; otherwise [label] is shown. Either way the pill
+     * gets the same trailing info icon and is pressable, matching Telegram's native ad pill.
+     */
+    public void setCustomAd(CharSequence label, boolean nativeStyle) {
+        if (!TextUtils.equals(customAdLabel, label) || customAdNative != nativeStyle) {
             adText = null;
         }
         customAdLabel = label;
+        customAdNative = nativeStyle;
     }
 
     private boolean hasAdLabel() {
-        return ad != null || customAdLabel != null;
+        return ad != null || customAdLabel != null || customAdNative;
+    }
+
+    // Builds an ad pill label: [text] followed by Telegram's small info (⋮) icon. Shared by Telegram's own
+    // native sponsored pill and both of our ads (TELEGRAM + NOVAGRAM), so the icon is identical everywhere.
+    private CharSequence buildAdLabel(CharSequence text) {
+        final SpannableStringBuilder sb = new SpannableStringBuilder(text).append(" i");
+        final ColoredImageSpan span = new ColoredImageSpan(R.drawable.ic_ab_other);
+        span.setScale(.55f, .55f);
+        span.spaceScaleX = .7f;
+        span.translate(-dp(2), 0);
+        sb.setSpan(span, sb.length() - 1, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return sb;
     }
 
     private boolean allowEmojiStatus = true;
@@ -512,20 +532,12 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
 
         if (hasAdLabel()) {
             if (adText == null) {
-                final CharSequence label;
-                if (customAdLabel != null) {
-                    // Our own label — no trailing "i" info icon (there is no sponsored-options menu).
-                    label = customAdLabel;
-                } else {
-                    final SpannableStringBuilder sb = new SpannableStringBuilder(getString(R.string.SearchAd)).append(" i");
-                    final ColoredImageSpan span = new ColoredImageSpan(R.drawable.ic_ab_other);
-                    span.setScale(.55f, .55f);
-                    span.spaceScaleX = .7f;
-                    span.translate(-dp(2), 0);
-                    sb.setSpan(span, sb.length() - 1, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                    label = sb;
-                }
-                adText = new Text(label, 12);
+                // NOVAGRAM ad → our own text; TELEGRAM ad or Telegram's own native peer → the localized "Ad".
+                // Both get the same trailing info icon (see buildAdLabel), so every ad pill looks alike.
+                final CharSequence baseText = (customAdLabel != null && !customAdNative)
+                        ? customAdLabel
+                        : getString(R.string.SearchAd);
+                adText = new Text(buildAdLabel(baseText), 12);
             }
             if (adBackgroundPaint == null) {
                 adBackgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -1219,6 +1231,23 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
                 if (adBounce.isPressed()) {
                     onSponsoredOptionsClick.run(this, ad);
                 }
+                adBounce.setPressed(false);
+                return true;
+            } else if (event.getAction() == MotionEvent.ACTION_CANCEL) {
+                adBounce.setPressed(false);
+                return true;
+            }
+            if (hit || adBounce.isPressed())
+                return true;
+        } else if (customAdNative || customAdLabel != null) {
+            // Novagram: our own ad pill (both TELEGRAM- and NOVAGRAM-platform). It is pressable (bounce
+            // feedback) exactly like Telegram's native "Ad" pill, but there is no sponsored-options menu yet —
+            // so a tap on the pill is consumed with no action, while a tap on the rest of the row still opens
+            // the channel.
+            final boolean hit = adBounds.contains(event.getX(), event.getY());
+            if (event.getAction() == MotionEvent.ACTION_DOWN || event.getAction() == MotionEvent.ACTION_MOVE) {
+                adBounce.setPressed(hit);
+            } else if (event.getAction() == MotionEvent.ACTION_UP) {
                 adBounce.setPressed(false);
                 return true;
             } else if (event.getAction() == MotionEvent.ACTION_CANCEL) {

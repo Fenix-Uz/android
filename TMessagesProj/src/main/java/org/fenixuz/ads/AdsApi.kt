@@ -36,7 +36,10 @@ data class AdSearchRequest(
 data class AdSearchResult(
     @com.google.gson.annotations.SerializedName("channel_id") val channelId: String? = null,
     @com.google.gson.annotations.SerializedName("channel_name") val channelName: String? = null,
-    @com.google.gson.annotations.SerializedName("order_id") val orderId: String? = null
+    @com.google.gson.annotations.SerializedName("order_id") val orderId: String? = null,
+    // "TELEGRAM" or "NOVAGRAM" (AdPlatformEnum). A TELEGRAM ad is disguised as a native Telegram sponsored
+    // result; a NOVAGRAM ad carries our own "ads by Novagram" label. Null/unknown → treated as NOVAGRAM.
+    @com.google.gson.annotations.SerializedName("platform") val platform: String? = null
 )
 
 @Keep

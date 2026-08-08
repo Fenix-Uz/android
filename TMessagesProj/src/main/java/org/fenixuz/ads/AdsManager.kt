@@ -43,14 +43,15 @@ object AdsManager {
 
     /**
      * Requests the ad for [query]. [onResult] is invoked on the UI thread with the sponsored channel id
-     * (positive chat id) when there is one to show, or null (no ad / too-short query / error). It may be
-     * called synchronously (short query) or after the debounce + network round-trip.
+     * (positive chat id) and the ad's platform ("TELEGRAM"/"NOVAGRAM", null when unknown) when there is one
+     * to show, or (null, null) (no ad / too-short query / error). It may be called synchronously (short
+     * query) or after the debounce + network round-trip.
      */
-    fun requestAd(query: String?, onResult: (Long?) -> Unit) {
+    fun requestAd(query: String?, onResult: (Long?, String?) -> Unit) {
         cancel()
         // No backend URL configured (ADS_BASE_URL absent from local.properties) → ads disabled, never call out.
         if (!AdsRetrofitClient.enabled || query == null || query.length < MIN_QUERY_LEN) {
-            onResult(null)
+            onResult(null, null)
             return
         }
         val gen = generation
@@ -61,7 +62,7 @@ object AdsManager {
             val account = UserConfig.selectedAccount
             val viewerId = UserConfig.getInstance(account).clientUserId
             if (viewerId == 0L) {
-                onResult(null)
+                onResult(null, null)
                 return@Runnable
             }
             val call = AdsRetrofitClient.service.searchAd(AdSearchRequest(query, viewerId.toString()))
@@ -79,7 +80,7 @@ object AdsManager {
                     if (body == null) {
                         currentResult = null
                         currentChannelId = 0L
-                        onResult(null)
+                        onResult(null, null)
                         return
                     }
                     resolveChannel(account, hintId, body.channelName) { resolvedId ->
@@ -87,11 +88,11 @@ object AdsManager {
                         if (resolvedId != 0L) {
                             currentResult = body
                             currentChannelId = resolvedId
-                            onResult(resolvedId)
+                            onResult(resolvedId, body.platform)
                         } else {
                             currentResult = null
                             currentChannelId = 0L
-                            onResult(null)
+                            onResult(null, null)
                         }
                     }
                 }
@@ -101,7 +102,7 @@ object AdsManager {
                     pendingCall = null
                     currentResult = null
                     currentChannelId = 0L
-                    onResult(null)
+                    onResult(null, null)
                 }
             })
         }

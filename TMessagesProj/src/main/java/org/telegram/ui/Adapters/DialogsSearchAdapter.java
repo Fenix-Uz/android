@@ -144,8 +144,11 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
     // native sponsoredPeers so both can appear. See org.fenixuz.ads.AdsManager.
     private TLRPC.Chat adChat;
     private String adQuery;
-    // Label drawn in the ad pill on our sponsored row (Telegram-style ad disclosure).
-    private static final String AD_LABEL = "ads by Novagram";
+    // Platform of the currently shown ad ("TELEGRAM"/"NOVAGRAM", null = unknown → treated as NOVAGRAM).
+    private String adPlatform;
+    // Label drawn in the ad pill on our sponsored row when the ad is NOVAGRAM-platform. A TELEGRAM-platform
+    // ad instead reuses Telegram's own native ad label so it is indistinguishable from a real sponsored row.
+    private static final String AD_LABEL = "ad by Novagram";
     public DialogsSearchAdapterDelegate delegate;
     private int needMessagesSearch;
     private boolean messagesSearchEndReached;
@@ -1167,12 +1170,14 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
             final String adQ = query;
             adQuery = adQ;
             adChat = null;
-            org.fenixuz.ads.AdsManager.INSTANCE.requestAd(adQ, (channelId) -> {
+            adPlatform = null;
+            org.fenixuz.ads.AdsManager.INSTANCE.requestAd(adQ, (channelId, platform) -> {
                 AndroidUtilities.runOnUIThread(() -> {
                     if (!TextUtils.equals(adQuery, adQ)) {
                         return;
                     }
                     adChat = channelId != null ? MessagesController.getInstance(currentAccount).getChat(channelId) : null;
+                    adPlatform = adChat != null ? platform : null;
                     notifyDataSetChanged();
                 });
                 return kotlin.Unit.INSTANCE;
@@ -2013,7 +2018,10 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                 cell.allowBotOpenButton(isRecent, this::openBotApp);
                 cell.setOnSponsoredOptionsClick(this::openSponsoredOptions);
                 cell.setAd(obj instanceof TLRPC.TL_sponsoredPeer ? (TLRPC.TL_sponsoredPeer) obj : null);
-                cell.setCustomAd(isOurAd ? AD_LABEL : null);
+                // Novagram: a TELEGRAM-platform ad is disguised as a native Telegram sponsored result; a
+                // NOVAGRAM ad (or unknown platform) carries our own "ads by Novagram" label.
+                final boolean telegramStyleAd = isOurAd && "TELEGRAM".equalsIgnoreCase(adPlatform);
+                cell.setCustomAd(isOurAd && !telegramStyleAd ? AD_LABEL : null, telegramStyleAd);
                 cell.setData(user != null ? user : chat, encryptedChat, name, username, true, savedMessages);
                 cell.setChecked(delegate.isSelected(cell.getDialogId()), oldDialogId == cell.getDialogId());
                 break;
