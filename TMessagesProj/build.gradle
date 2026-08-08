@@ -146,6 +146,8 @@ android {
         // Novagram: ads backend base URL — kept out of the public repo (read from local.properties).
         // Empty when unset → the ads feature disables itself gracefully (see org.fenixuz.ads.AdsRetrofitClient).
         buildConfigField "String", "ADS_BASE_URL", "\"" + (getProps("ADS_BASE_URL") ?: "") + "\""
+        // Server API key sent as the X-API-Key header — the search_ads endpoints require it since backend v2.1.0.
+        buildConfigField "String", "ADS_API_KEY", "\"" + (getProps("ADS_API_KEY") ?: "") + "\""
 
         externalNativeBuild {
             cmake {

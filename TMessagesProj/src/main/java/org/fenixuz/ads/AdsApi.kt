@@ -2,6 +2,7 @@ package org.fenixuz.ads
 
 import androidx.annotation.Keep
 import com.google.gson.GsonBuilder
+import okhttp3.OkHttpClient
 import org.telegram.messenger.BuildConfig
 import retrofit2.Call
 import retrofit2.Retrofit
@@ -53,16 +54,30 @@ interface AdsApiService {
 }
 
 object AdsRetrofitClient {
-    // Base URL comes from BuildConfig (fed by ADS_BASE_URL in local.properties), so the ads endpoint
-    // never lives in the public source tree. Blank when unset — [enabled] is then false and no request is
-    // ever made (Retrofit is never built with a blank baseUrl, which would throw).
+    // Base URL + API key come from BuildConfig (fed by ADS_BASE_URL / ADS_API_KEY in local.properties), so
+    // neither the ads endpoint nor the key lives in the public source tree. Blank when unset — [enabled] is
+    // then false and no request is ever made (Retrofit is never built with a blank baseUrl, which would throw).
     private val BASE_URL: String = BuildConfig.ADS_BASE_URL
+    private val API_KEY: String = BuildConfig.ADS_API_KEY
 
-    val enabled: Boolean get() = BASE_URL.isNotBlank()
+    // Both must be present: the search_ads endpoints reject requests without X-API-Key (HTTP 401) since
+    // backend v2.1.0, so without a key the feature would only hammer the backend with 401s — disable it instead.
+    val enabled: Boolean get() = BASE_URL.isNotBlank() && API_KEY.isNotBlank()
 
     val service: AdsApiService by lazy {
+        // Attach X-API-Key to every request. This Retrofit only ever talks to the ads backend, so a blanket
+        // interceptor is safe and also covers any future ads endpoints without per-method annotations.
+        val client = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .header("X-API-Key", API_KEY)
+                    .build()
+                chain.proceed(request)
+            }
+            .build()
         Retrofit.Builder()
             .baseUrl(BASE_URL)
+            .client(client)
             .addConverterFactory(ScalarsConverterFactory.create())
             .addConverterFactory(GsonConverterFactory.create(GsonBuilder().setLenient().create()))
             .build()
