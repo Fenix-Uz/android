@@ -23,7 +23,7 @@ import java.util.Locale
 object AdsManager {
 
     private const val MIN_QUERY_LEN = 4
-    private const val DEBOUNCE_MS = 500L
+    private const val DEBOUNCE_MS = 300L
 
     /** The ad currently shown in search, kept so a tap can be attributed to its order. */
     private var currentResult: AdSearchResult? = null
