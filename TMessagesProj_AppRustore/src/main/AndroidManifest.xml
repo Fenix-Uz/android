@@ -3,6 +3,17 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:installLocation="auto">
 
+    <!--
+        Novagram: RuStore rejects a build that declares REQUEST_INSTALL_PACKAGES, since it allows installing
+        APKs outside the store's review. The base library manifest declares it for "open an .apk received in
+        a chat", so it is dropped from the merged manifest here. Safe for this build: it is not a standalone
+        self-updating build (ApplicationLoaderImpl does not override isStandalone(), and nothing installs an
+        APK by itself) — updates come from RuStore. Tapping an .apk in a chat now shows the restricted dialog
+        (AndroidUtilities.openForView -> createApkRestrictedDialog) instead of the system installer.
+        Do NOT copy this into TMessagesProj_AppStandalone, which does update itself by installing an APK.
+    -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" tools:node="remove" />
+
     <application android:name="org.telegram.messenger.ApplicationLoaderImpl" tools:replace="name">
         <service
             android:name="org.telegram.messenger.GoogleVoiceClientService"
