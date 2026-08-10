@@ -16,6 +16,7 @@ import org.fenixuz.ui.onboarding.FenixTour
 import org.telegram.messenger.NotificationCenter
 import org.telegram.messenger.R
 import org.telegram.ui.ActionBar.ActionBar
+import org.fenixuz.utils.ApkShield
 import org.fenixuz.utils.AutoAcceptJoin
 import org.fenixuz.utils.CameraSituation
 import org.fenixuz.utils.ConfirmDialogsPref
@@ -85,6 +86,7 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
     private val CHANGE_COMMON_PASSWORD = 24
     private val GHOST_ACTIONBAR_BTN = 26
     private val ROUND_CAMERA_FRONT = 27
+    private val APK_SHIELD = 28
 
     // Onboarding: a toolbar "?" replays the full feature tour; the short tour auto-runs once on first open.
     private val HELP_BUTTON = 1001
@@ -113,6 +115,7 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
         AUTO_ACCEPT_JOIN to "auto_accept_join",
         REMINDER_ENABLED to "reminder",
         STRANGER_SHIELD to "protection_from_strangers",
+        APK_SHIELD to "block_apk",
         ROUND_CAMERA_FRONT to "round_video_camera"
     )
     private var targetConsumed = false
@@ -352,6 +355,11 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
         } else {
             items.add(UItem.asButton(STRANGER_INBOX, LanguageCode.getMyTitles(321)))
         }
+        // Block incoming .apk attachments — same Privacy section, it is the same "protect me" intent.
+        items.add(
+            UItem.asButtonCheck(APK_SHIELD, LanguageCode.getMyTitles(378), LanguageCode.getMyTitles(379))
+                .setChecked(ApkShield.isEnabled())
+        )
         items.add(UItem.asShadow(null))
 
         resolveTargetPosition(items)
@@ -489,6 +497,10 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
                 val args = Bundle()
                 args.putBoolean("fenixStrangerInbox", true)
                 presentFragment(DialogsActivity(args))
+            }
+            APK_SHIELD -> {
+                ApkShield.toggle()
+                (view as NotificationsCheckCell).setChecked(ApkShield.isEnabled())
             }
         }
         // Novagram: keep the cached UItem model in sync with the toggled cell. setChecked() only updates the

@@ -621,6 +621,9 @@ public class DownloadController extends BaseController implements NotificationCe
         }
         if (messageObject.isHiddenSensitive())
             return false;
+        // Novagram: a blocked incoming .apk is never shown, so don't spend the user's data auto-fetching it.
+        if (org.fenixuz.utils.ApkShield.shouldHide(messageObject.messageOwner))
+            return false;
         return canDownloadMediaInternal(messageObject) == 1;
     }
 

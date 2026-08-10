@@ -5913,6 +5913,13 @@ public class MessageObject {
             if (!TextUtils.isEmpty(restrictionReason)) {
                 messageText = restrictionReason;
                 isRestrictedMessage = true;
+            } else if (org.fenixuz.utils.ApkShield.shouldHide(messageOwner)) {
+                // Novagram: an incoming .apk while "Block APK files" is on. Reusing the restricted-message
+                // path collapses the message to TYPE_TEXT (see setType), so the document UI, its download
+                // button and its media entry disappear everywhere at once — the message itself stays in
+                // place, so the conversation keeps no holes. Outgoing files are never affected.
+                messageText = org.fenixuz.utils.LanguageCode.INSTANCE.getMyTitles(377);
+                isRestrictedMessage = true;
             } else if (messageOwner.rich_message != null) {
                 messageText = formatRichMessage(messageOwner.rich_message, isOutOwner());
                 messageText = AndroidUtilities.replaceNewLines(messageText);

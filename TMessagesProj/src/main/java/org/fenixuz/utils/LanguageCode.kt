@@ -1741,6 +1741,9 @@ object LanguageCode {
         titlesLanguages.add(TitleLanguages(374, "No stranger chats", "Begona suhbatlar yo'q", "Нет чужих чатов"))
         titlesLanguages.add(TitleLanguages(375, "Select all", "Hammasini belgilash", "Выбрать все"))
         titlesLanguages.add(TitleLanguages(376, "Deselect all", "Belgilashni bekor qilish", "Снять выделение"))
+        titlesLanguages.add(TitleLanguages(377, "APK file blocked", "APK fayl bloklandi", "APK-файл заблокирован"))
+        titlesLanguages.add(TitleLanguages(378, "Block APK files", "APK fayllarni bloklash", "Блокировать APK-файлы"))
+        titlesLanguages.add(TitleLanguages(379, "Incoming .apk files are not shown in chats — protection from malicious apps. Files you send yourself are not affected.", "Kelgan .apk fayllar suhbatlarda ko'rsatilmaydi — zararli ilovalardan himoya. O'zingiz yuborgan fayllarga ta'sir qilmaydi.", "Входящие .apk-файлы не показываются в чатах — защита от вредоносных приложений. На файлы, которые вы отправляете сами, не влияет."))
     }
 
     init {
