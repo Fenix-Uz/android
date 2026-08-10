@@ -1768,6 +1768,14 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
      * [MessageObject.deletedBy] is the already-resolved tag shown in the bubble; the store is consulted as a
      * fallback for a message that was selected before its cell was bound.
      */
+    /**
+     * Novagram: set while deleted messages are being re-sent as copies, so a nested bulk-forward call made
+     * from inside processForwardFromMyName can never divert again. Belt-and-braces next to [canResendAsCopy]
+     * — that predicate already avoids the known fallbacks, this also survives an upstream change adding a new
+     * one. Only ever touched on the send (UI) thread, and failing "closed" just means the old forward path.
+     */
+    private boolean fenixResendingDeletedCopy;
+
     private static boolean isLocallyKeptDeletedMessage(MessageObject messageObject) {
         if (messageObject == null || messageObject.messageOwner == null) {
             return false;
@@ -1777,6 +1785,31 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         }
         final String mark = org.fenixuz.utils.DeletedMsg.INSTANCE.whoDelete(messageObject.getDialogId(), messageObject.messageOwner.id);
         return mark != null && !mark.isEmpty();
+    }
+
+    /**
+     * Novagram: true only when [processForwardFromMyName] can really re-send this message as a NEW message.
+     * This mirrors that method's branch structure on purpose: its two fallbacks (unsupported media to a normal
+     * chat, and no-text to a secret chat) hand the message back to the bulk forward with notify=true and
+     * scheduleDate=0 — which is exactly the condition that diverts messages here, so diverting one of those
+     * would bounce back and forth forever. Anything not listed below keeps the untouched forward path.
+     */
+    private static boolean canResendAsCopy(MessageObject messageObject) {
+        final TLRPC.Message msg = messageObject.messageOwner;
+        final TLRPC.MessageMedia media = msg.media;
+        final boolean hasRealMedia = media != null
+                && !(media instanceof TLRPC.TL_messageMediaEmpty)
+                && !(media instanceof TLRPC.TL_messageMediaWebPage)
+                && !(media instanceof TLRPC.TL_messageMediaGame)
+                && !(media instanceof TLRPC.TL_messageMediaInvoice);
+        if (hasRealMedia) {
+            return media.photo instanceof TLRPC.TL_photo
+                    || media.document instanceof TLRPC.TL_document
+                    || media instanceof TLRPC.TL_messageMediaVenue
+                    || media instanceof TLRPC.TL_messageMediaGeo
+                    || media.phone_number != null;
+        }
+        return !TextUtils.isEmpty(msg.message);
     }
 
     public void processForwardFromMyName(MessageObject messageObject, long did, long payStars, long monoForumPeerId, MessageSuggestionParams suggestionParams) {
@@ -2096,12 +2129,12 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         // scheduled or silent forward deliberately stays on the original path instead of quietly being sent
         // right away (or with sound). Costs one O(1) lookup per message and changes nothing when the store
         // is empty, which is the case for everyone who never enabled the feature.
-        if (scheduleDate == 0 && notify) {
+        if (scheduleDate == 0 && notify && !fenixResendingDeletedCopy) {
             ArrayList<MessageObject> goneFromServer = null;
             ArrayList<MessageObject> stillOnServer = null;
             for (int a = 0; a < messages.size(); a++) {
                 final MessageObject msgObj = messages.get(a);
-                if (isLocallyKeptDeletedMessage(msgObj)) {
+                if (isLocallyKeptDeletedMessage(msgObj) && canResendAsCopy(msgObj)) {
                     if (goneFromServer == null) {
                         goneFromServer = new ArrayList<>();
                         // Never mutate the caller's list — start a fresh copy of everything seen so far.
@@ -2113,8 +2146,13 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                 }
             }
             if (goneFromServer != null) {
-                for (int a = 0; a < goneFromServer.size(); a++) {
-                    processForwardFromMyName(goneFromServer.get(a), peer, payStars, monoForumPeerId, suggestionParams);
+                fenixResendingDeletedCopy = true;
+                try {
+                    for (int a = 0; a < goneFromServer.size(); a++) {
+                        processForwardFromMyName(goneFromServer.get(a), peer, payStars, monoForumPeerId, suggestionParams);
+                    }
+                } finally {
+                    fenixResendingDeletedCopy = false;
                 }
                 if (stillOnServer.isEmpty()) {
                     return 0;
