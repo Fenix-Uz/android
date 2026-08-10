@@ -1762,6 +1762,23 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         }
     }
 
+    /**
+     * Novagram: true when this message only exists because "save deleted messages" kept it on this device —
+     * the server has dropped it, so it can never be forwarded by id and must be re-sent as a copy instead.
+     * [MessageObject.deletedBy] is the already-resolved tag shown in the bubble; the store is consulted as a
+     * fallback for a message that was selected before its cell was bound.
+     */
+    private static boolean isLocallyKeptDeletedMessage(MessageObject messageObject) {
+        if (messageObject == null || messageObject.messageOwner == null) {
+            return false;
+        }
+        if (messageObject.deletedBy != null && !messageObject.deletedBy.isEmpty()) {
+            return true;
+        }
+        final String mark = org.fenixuz.utils.DeletedMsg.INSTANCE.whoDelete(messageObject.getDialogId(), messageObject.messageOwner.id);
+        return mark != null && !mark.isEmpty();
+    }
+
     public void processForwardFromMyName(MessageObject messageObject, long did, long payStars, long monoForumPeerId, MessageSuggestionParams suggestionParams) {
         if (messageObject == null) {
             return;
@@ -2070,6 +2087,42 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
     ) {
         if (messages == null || messages.isEmpty()) {
             return 0;
+        }
+        // Novagram: a message that survives only in our "save deleted messages" store is already gone from
+        // the server, so forwarding it by id is rejected — and because one request carries the whole
+        // selection, a single deleted message makes every healthy message next to it fail with a red "!".
+        // Re-send those as fresh copies and forward the remainder normally.
+        // Only for a plain, immediate forward: processForwardFromMyName takes no notify/scheduleDate, so a
+        // scheduled or silent forward deliberately stays on the original path instead of quietly being sent
+        // right away (or with sound). Costs one O(1) lookup per message and changes nothing when the store
+        // is empty, which is the case for everyone who never enabled the feature.
+        if (scheduleDate == 0 && notify) {
+            ArrayList<MessageObject> goneFromServer = null;
+            ArrayList<MessageObject> stillOnServer = null;
+            for (int a = 0; a < messages.size(); a++) {
+                final MessageObject msgObj = messages.get(a);
+                if (isLocallyKeptDeletedMessage(msgObj)) {
+                    if (goneFromServer == null) {
+                        goneFromServer = new ArrayList<>();
+                        // Never mutate the caller's list — start a fresh copy of everything seen so far.
+                        stillOnServer = new ArrayList<>(messages.subList(0, a));
+                    }
+                    goneFromServer.add(msgObj);
+                } else if (stillOnServer != null) {
+                    stillOnServer.add(msgObj);
+                }
+            }
+            if (goneFromServer != null) {
+                for (int a = 0; a < goneFromServer.size(); a++) {
+                    processForwardFromMyName(goneFromServer.get(a), peer, payStars, monoForumPeerId, suggestionParams);
+                }
+                if (stillOnServer.isEmpty()) {
+                    return 0;
+                }
+                // Recurse rather than reassign: `messages` is captured by the paid-confirmation lambda below
+                // and must stay effectively final. The second pass finds nothing to split and runs normally.
+                return sendMessage(stillOnServer, peer, forwardFromMyName, hideCaption, notify, scheduleDate, scheduleRepeatPeriod, replyToTopMsg, video_timestamp, payStars, monoForumPeerId, suggestionParams);
+            }
         }
         int sendResult = 0;
         long myId = getUserConfig().getClientUserId();
