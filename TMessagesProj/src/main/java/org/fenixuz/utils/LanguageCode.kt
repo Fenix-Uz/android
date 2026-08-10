@@ -1739,6 +1739,8 @@ object LanguageCode {
         titlesLanguages.add(TitleLanguages(372, "No secret chats", "Yashirin chatlar yo'q", "Нет секретных чатов"))
         titlesLanguages.add(TitleLanguages(373, "Not a stranger", "Begona emas", "Не незнакомец"))
         titlesLanguages.add(TitleLanguages(374, "No stranger chats", "Begona suhbatlar yo'q", "Нет чужих чатов"))
+        titlesLanguages.add(TitleLanguages(375, "Select all", "Hammasini belgilash", "Выбрать все"))
+        titlesLanguages.add(TitleLanguages(376, "Deselect all", "Belgilashni bekor qilish", "Снять выделение"))
     }
 
     init {

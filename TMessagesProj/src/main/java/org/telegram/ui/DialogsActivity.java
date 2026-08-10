@@ -599,6 +599,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private ActionBarMenuSubItem secretChatItem;
     @Nullable
     private ActionBarMenuSubItem strangerTrustItem;
+    @Nullable
+    private ActionBarMenuSubItem selectAllItem;
     public SecretLockScreenDialog secretLockScreenDialog = null;
 
     private float additionalFloatingTranslation;
@@ -731,6 +733,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private final static int community_ungroup = 112;
     // Novagram: "Not a stranger" — move selected chats out of the Stranger inbox back to the main list.
     private final static int stranger_trust = 113;
+    // Novagram: "Select all" — select every visible chat in the current folder/tab at once.
+    private final static int select_all = 114;
 
     private final static int ARCHIVE_ITEM_STATE_PINNED = 0;
     private final static int ARCHIVE_ITEM_STATE_SHOWED = 1;
@@ -4050,6 +4054,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         undoView.showWithAction(did, UndoView.ACTION_REMOVED_FROM_FOLDER, neverShow.size(), filter, null, null);
                     }
                     hideActionMode(false);
+                } else if (id == select_all) {
+                    selectAllDialogs();
                 } else if (id == pin || id == read || id == delete || id == clear || id == mute || id == archive || id == block || id == archive2 || id == pin2 || id == secret_chat || id == stranger_trust) {
                     performSelectedDialogsAction(selectedDialogs, id, true, false);
                 }
@@ -6807,6 +6813,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         // Novagram: only shown in the Stranger inbox — moves selected chats back to the main list.
         strangerTrustItem = otherItem.addSubItem(stranger_trust, R.drawable.msg_contacts, org.fenixuz.utils.LanguageCode.INSTANCE.getMyTitles(373));
         strangerTrustItem.setVisibility(View.GONE);
+        // Novagram: select every visible chat in the current folder/tab at once.
+        selectAllItem = otherItem.addSubItem(select_all, R.drawable.msg_select, org.fenixuz.utils.LanguageCode.INSTANCE.getMyTitles(375));
 
         muteItem.setOnLongClickListener(e -> {
             performSelectedDialogsAction(selectedDialogs, mute, true, true);
@@ -7549,6 +7557,66 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
         updateFloatingButtonVisibility(true);
         updateDialogsHint();
+    }
+
+    /**
+     * Novagram: select every VISIBLE chat in the current folder/tab at once (toggle: if all are already
+     * selected, clear the selection). "Visible" is read from the page adapter's own items, so it respects
+     * the active folder, the secret folder and the stranger-inbox filters — never the raw folder list.
+     * One pass + a single notifyDataSetChanged (onBind reads selectedDialogs, a shared list) + updateCounters.
+     */
+    private void selectAllDialogs() {
+        if (viewPages == null || viewPages.length == 0 || viewPages[0] == null || viewPages[0].dialogsAdapter == null) {
+            return;
+        }
+        final DialogsAdapter adapter = viewPages[0].dialogsAdapter;
+        final ArrayList<Long> visible = new ArrayList<>();
+        final int n = adapter.getItemCount();
+        for (int i = 0; i < n; i++) {
+            Object item = adapter.getItem(i);
+            if (item instanceof TLRPC.Dialog) {
+                final long id = ((TLRPC.Dialog) item).id;
+                if (onlySelect && getMessagesController().isForum(id)) {
+                    continue; // forums can't be multi-selected in picker mode (mirrors addOrRemoveSelectedDialog)
+                }
+                visible.add(id);
+            }
+        }
+        if (visible.isEmpty()) {
+            return;
+        }
+        final HashSet<Long> selectedSet = new HashSet<>(selectedDialogs);
+        if (selectedSet.containsAll(visible)) {
+            // everything already selected → toggle off
+            selectedDialogs.clear();
+        } else {
+            for (int i = 0; i < visible.size(); i++) {
+                final long id = visible.get(i);
+                if (selectedSet.add(id)) {
+                    selectedDialogs.add(id);
+                }
+            }
+        }
+        // onBind sets each cell's checkmark from selectedDialogs.contains(...), so one refresh updates them all.
+        for (int p = 0; p < viewPages.length; p++) {
+            if (viewPages[p] != null && viewPages[p].dialogsAdapter != null) {
+                viewPages[p].dialogsAdapter.notifyDataSetChanged();
+            }
+        }
+        if (selectedDialogs.isEmpty()) {
+            hideActionMode(false);
+            return;
+        }
+        updateCounters(false);
+        // updateCounters recomputes the action tallies but NOT the top count number — that is set by
+        // showOrUpdateActionMode on a normal tap. The action mode is already open here, so just refresh
+        // the number directly (otherwise it stayed frozen at the initial 1).
+        if (selectedDialogsCountTextView != null) {
+            selectedDialogsCountTextView.setNumber(Math.max(1, selectedDialogs.size()), true);
+        }
+        if (selectAllItem != null) {
+            selectAllItem.setText(org.fenixuz.utils.LanguageCode.INSTANCE.getMyTitles(376)); // now "Deselect all"
+        }
     }
 
     public boolean addOrRemoveSelectedDialog(long did, View cell) {
@@ -9184,6 +9252,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private void hideActionMode(boolean animateCheck) {
         actionBar.hideActionMode();
         selectedDialogs.clear();
+        // Novagram: reset the "Select all" toggle label so the next selection session starts fresh.
+        if (selectAllItem != null) {
+            selectAllItem.setText(org.fenixuz.utils.LanguageCode.INSTANCE.getMyTitles(375));
+        }
         if (backDrawable != null) {
             backDrawable.setRotation(0, true);
         }
