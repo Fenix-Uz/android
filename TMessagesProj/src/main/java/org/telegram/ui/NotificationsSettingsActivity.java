@@ -726,8 +726,18 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
                 editor.commit();
                 getNotificationsController().updateBadge();
             } else if (position == notificationsServiceConnectionRow) {
-                SharedPreferences preferences = MessagesController.getNotificationsSettings(currentAccount);
-                enabled = preferences.getBoolean("pushConnection", getMessagesController().backgroundConnection);
+                // Novagram: write where isPushConnectionEnabled() reads — the GLOBAL notifications prefs
+                // ("Notifications", i.e. account 0). Upstream wrote to the current account's file
+                // ("Notifications" + N), so on any account other than the first the switch silently failed to
+                // persist. Harmless while the default was off; now that it defaults on it would mean a
+                // multi-account user could not turn the background connection off at all.
+                SharedPreferences preferences = MessagesController.getGlobalNotificationsSettings();
+                // Novagram: read the same source of truth the connection itself uses, so the switch reflects
+                // the real state. Upstream read the raw backgroundConnection field here, which stays false for
+                // us and would show the row as off while the connection is actually on (see
+                // ConnectionsManager.isPushConnectionEnabled) — the first tap would then "enable" what was
+                // already enabled, so turning it off would take two taps.
+                enabled = getConnectionsManager().isPushConnectionEnabled();
                 SharedPreferences.Editor editor = preferences.edit();
                 editor.putBoolean("pushConnection", !enabled);
                 editor.commit();
@@ -1020,7 +1030,8 @@ public class NotificationsSettingsActivity extends BaseFragment implements Notif
                     } else if (position == notificationsServiceRow) {
                         checkCell.setTextAndValueAndCheck(getString("NotificationsService", R.string.NotificationsService), getString("NotificationsServiceInfo", R.string.NotificationsServiceInfo), preferences.getBoolean("pushService", getMessagesController().keepAliveService), true, true);
                     } else if (position == notificationsServiceConnectionRow) {
-                        checkCell.setTextAndValueAndCheck(getString("NotificationsServiceConnection", R.string.NotificationsServiceConnection), getString("NotificationsServiceConnectionInfo", R.string.NotificationsServiceConnectionInfo), preferences.getBoolean("pushConnection", getMessagesController().backgroundConnection), true, true);
+                        // Novagram: same source of truth as the click handler (see above).
+                        checkCell.setTextAndValueAndCheck(getString("NotificationsServiceConnection", R.string.NotificationsServiceConnection), getString("NotificationsServiceConnectionInfo", R.string.NotificationsServiceConnectionInfo), getConnectionsManager().isPushConnectionEnabled(), true, true);
                     } else if (position == badgeNumberShowRow) {
                         checkCell.setTextAndCheck(getString("BadgeNumberShow", R.string.BadgeNumberShow), getNotificationsController().showBadgeNumber, true);
                     } else if (position == badgeNumberMutedRow) {

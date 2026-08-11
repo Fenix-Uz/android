@@ -280,12 +280,26 @@ public class ConnectionsManager extends BaseController {
         return pushString;
     }
 
+    // NOTE: this runs from the ConnectionsManager CONSTRUCTOR (see above), i.e. before UserConfig is loaded.
+    // Keep it to plain preference reads. Anything that needs the logged-in user — such as the per-account
+    // notification switch, whose key is built from getClientUserId() — must NOT be consulted here; doing so
+    // reads a key for user id 0 and can force NotificationsController's static initializer to run before the
+    // application context exists, which kills notifications outright. Gate per account at runtime instead.
     public boolean isPushConnectionEnabled() {
         SharedPreferences preferences = MessagesController.getGlobalNotificationsSettings();
         if (preferences.contains("pushConnection")) {
             return preferences.getBoolean("pushConnection", true);
         } else {
-            return MessagesController.getMainSettings(UserConfig.selectedAccount).getBoolean("backgroundConnection", false);
+            // Novagram: default ON. Telegram's own FCM push cannot reach this fork (our token comes from our
+            // Firebase project, so their servers can't deliver to it), which left background notifications
+            // working only by luck — whenever the OS happened to keep our process alive. This background
+            // MTProto connection is what actually delivers them, and it was off by default because upstream
+            // leaves it to the server's "background_connection" appConfig value, which we never receive.
+            // Device-verified (Samsung A13 / Android 14): with only this on, a message arrived ~10 minutes
+            // after the app was swiped away. Users who touched the switch are unaffected — they have an
+            // explicit "pushConnection" preference, handled above. Cost is one extra socket; no foreground
+            // service and no persistent notification are involved.
+            return MessagesController.getMainSettings(UserConfig.selectedAccount).getBoolean("backgroundConnection", true);
         }
     }
 
