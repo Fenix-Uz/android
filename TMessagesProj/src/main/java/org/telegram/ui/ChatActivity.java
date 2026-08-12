@@ -3404,6 +3404,23 @@ public class ChatActivity extends BaseFragment implements
         return dialog_id;
     }
 
+    /**
+     * Novagram: keep the chat-menu "Voice input" entry in step with the composer mic. Both read the same
+     * gate ({@link org.fenixuz.utils.VoiceDictation#isMicVisible}) so the feature is never half-present —
+     * a menu entry with no mic would still start a dictation the user cannot see they are in.
+     * No-op on chats where the entry was never added (channels you cannot post in, non-default modes).
+     */
+    private void updateVoiceInputMenuItem() {
+        if (headerItem == null) {
+            return;
+        }
+        if (org.fenixuz.utils.VoiceDictation.isMicVisible(org.telegram.messenger.ApplicationLoader.applicationContext)) {
+            headerItem.showSubItem(voice_input);
+        } else {
+            headerItem.hideSubItem(voice_input);
+        }
+    }
+
     public void onFragmentDestroy() {
         super.onFragmentDestroy();
         // Novagram: stop any running ".heart" animation for this chat so its timer doesn't outlive the screen.
@@ -4513,6 +4530,9 @@ public class ChatActivity extends BaseFragment implements
             if (chatMode == MODE_DEFAULT && (currentChat == null || ChatObject.canSendMessages(currentChat))) {
                 headerItem.lazilyAddSubItem(voice_input, R.drawable.fenix_mic_ic,
                         org.fenixuz.utils.LanguageCode.INSTANCE.getMyTitles(308));
+                // Follows the same switch as the composer mic, so the feature is either fully on or fully
+                // gone — no dead menu entry left behind. Kept in sync on resume by updateVoiceInputMenuItem().
+                updateVoiceInputMenuItem();
                 // Novagram: auto-translate outgoing messages — moved here from the Novagram settings screen,
                 // sitting next to voice-to-text. Tapping opens the per-chat target-language picker.
                 headerItem.lazilyAddSubItem(auto_translate, R.drawable.msg_translate,
@@ -30074,6 +30094,8 @@ public class ChatActivity extends BaseFragment implements
         if (chatActivityEnterView != null) {
             chatActivityEnterView.onResume();
         }
+        // Novagram: the mic switch may have been flipped in the settings while this chat sat in the back stack.
+        updateVoiceInputMenuItem();
         if (currentUser != null) {
             chatEnterTime = System.currentTimeMillis();
             chatLeaveTime = 0;

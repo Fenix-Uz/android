@@ -27,6 +27,7 @@ import org.fenixuz.utils.MessageReminder
 import org.fenixuz.utils.StoryDownload
 import org.fenixuz.utils.StoryUtil
 import org.fenixuz.utils.StrangerShield
+import org.fenixuz.utils.VoiceDictation
 import org.fenixuz.utils.EditMessage
 import org.fenixuz.utils.DeletedMsg
 import org.fenixuz.utils.GhostVariable
@@ -35,6 +36,7 @@ import org.fenixuz.ui.secret_chat.SecretPassword
 import org.fenixuz.ui.secret_chat.SecretPasscodeScreen
 import org.fenixuz.ui.secret_chat.SecretPasswordType
 import org.telegram.messenger.AndroidUtilities
+import org.telegram.messenger.ApplicationLoader
 import org.telegram.messenger.DownloadController
 import org.telegram.messenger.MessagesController
 import android.os.Bundle
@@ -87,6 +89,7 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
     private val GHOST_ACTIONBAR_BTN = 26
     private val ROUND_CAMERA_FRONT = 27
     private val APK_SHIELD = 28
+    private val VOICE_MIC = 29
 
     // Onboarding: a toolbar "?" replays the full feature tour; the short tour auto-runs once on first open.
     private val HELP_BUTTON = 1001
@@ -314,6 +317,17 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
         )
         items.add(UItem.asShadow(null))
 
+        // Composer voice-input mic. Only offered where it can actually work: on a device with no speech
+        // recogniser the mic is hidden anyway, so a switch for it would be a control that does nothing.
+        if (VoiceDictation.hasRecognizer(ApplicationLoader.applicationContext)) {
+            items.add(UItem.asHeader(LanguageCode.getMyTitles(380)))
+            items.add(
+                UItem.asButtonCheck(VOICE_MIC, LanguageCode.getMyTitles(381), LanguageCode.getMyTitles(382))
+                    .setChecked(VoiceDictation.isMicEnabled(ApplicationLoader.applicationContext))
+            )
+            items.add(UItem.asShadow(null))
+        }
+
         items.add(UItem.asHeader(LanguageCode.getMyTitles(240)))
         items.add(
             UItem.asButtonCheck(FOLDER_ICONS, LanguageCode.getMyTitles(240), LanguageCode.getMyTitles(241))
@@ -501,6 +515,11 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
             APK_SHIELD -> {
                 ApkShield.toggle()
                 (view as NotificationsCheckCell).setChecked(ApkShield.isEnabled())
+            }
+            VOICE_MIC -> {
+                val ctx = ApplicationLoader.applicationContext
+                VoiceDictation.setMicEnabled(ctx, !VoiceDictation.isMicEnabled(ctx))
+                (view as NotificationsCheckCell).setChecked(VoiceDictation.isMicEnabled(ctx))
             }
         }
         // Novagram: keep the cached UItem model in sync with the toggled cell. setChecked() only updates the

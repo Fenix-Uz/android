@@ -1744,6 +1744,9 @@ object LanguageCode {
         titlesLanguages.add(TitleLanguages(377, "APK file blocked", "APK fayl bloklandi", "APK-файл заблокирован"))
         titlesLanguages.add(TitleLanguages(378, "Block APK files", "APK fayllarni bloklash", "Блокировать APK-файлы"))
         titlesLanguages.add(TitleLanguages(379, "Incoming .apk files are not shown in chats — protection from malicious apps. Files you send yourself are not affected.", "Kelgan .apk fayllar suhbatlarda ko'rsatilmaydi — zararli ilovalardan himoya. O'zingiz yuborgan fayllarga ta'sir qilmaydi.", "Входящие .apk-файлы не показываются в чатах — защита от вредоносных приложений. На файлы, которые вы отправляете сами, не влияет."))
+        titlesLanguages.add(TitleLanguages(380, "Message field", "Xabar maydoni", "Поле сообщения"))
+        titlesLanguages.add(TitleLanguages(381, "Voice input button", "Ovozli kiritish tugmasi", "Кнопка голосового ввода"))
+        titlesLanguages.add(TitleLanguages(382, "Show the microphone next to the message field to dictate text instead of typing. Turn it off to free up space in the field. Hidden automatically on devices without speech recognition.", "Yozish o'rniga gapirib matn kiritish uchun xabar maydoni yonida mikrofonni ko'rsatadi. O'chirsangiz maydonda joy bo'shaydi. Nutqni tanimaydigan qurilmalarda avtomatik yashiriladi.", "Показывать микрофон рядом с полем сообщения, чтобы диктовать текст вместо набора. Выключите, чтобы освободить место в поле. На устройствах без распознавания речи скрывается автоматически."))
     }
 
     init {

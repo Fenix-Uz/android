@@ -92,6 +92,12 @@
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="ton"/>
         </intent>
+        <!-- Novagram: needed so SpeechRecognizer.isRecognitionAvailable() can actually see the installed
+             recogniser. Without it, targetSdk 35 package-visibility filtering hides every RecognitionService
+             from queryIntentServices() and voice dictation would look unavailable on devices that support it. -->
+        <intent>
+            <action android:name="android.speech.RecognitionService"/>
+        </intent>
     </queries>
 
     <application

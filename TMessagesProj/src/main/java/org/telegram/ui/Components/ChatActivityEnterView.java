@@ -2818,6 +2818,8 @@ public class ChatActivityEnterView extends FrameLayout implements
                 return true;
             });
             attachLayout.addView(voiceDictationButton, LayoutHelper.createLinear(DEFAULT_HEIGHT, DEFAULT_HEIGHT));
+            // Hidden when the user switched it off, or the device has no speech recogniser at all.
+            voiceDictationButton.setVisibility(org.fenixuz.utils.VoiceDictation.isMicVisible(context) ? VISIBLE : GONE);
 
             attachButton = new ImageView(context) {
                 @Override
@@ -6524,6 +6526,26 @@ public class ChatActivityEnterView extends FrameLayout implements
         }
     }
 
+    // Novagram: re-apply the mic's on/off state. Called on every resume, so flipping the switch in the
+    // Novagram settings takes effect the moment the chat is back on screen — not only on the next open.
+    // updateFieldRight() re-runs the right-margin maths, which already reserves the mic slot only while
+    // the button is VISIBLE, so the text field simply reclaims the space.
+    public void updateVoiceDictationVisibility() {
+        if (voiceDictationButton == null) {
+            return;
+        }
+        final boolean visible = org.fenixuz.utils.VoiceDictation.isMicVisible(getContext());
+        if (!visible && voiceDictation != null && voiceDictation.isListening()) {
+            // Never leave a hidden mic listening — the user would have no button left to stop it.
+            voiceDictation.stop();
+        }
+        if ((voiceDictationButton.getVisibility() == VISIBLE) == visible) {
+            return;
+        }
+        voiceDictationButton.setVisibility(visible ? VISIBLE : GONE);
+        updateFieldRight(lastAttachVisible);
+    }
+
     // Novagram: mic tap — start dictation, or finish it (the final result is then translated in onFinished).
     public boolean toggleVoiceDictation() {
         if (!ensureVoiceDictation()) {
@@ -6805,6 +6827,8 @@ public class ChatActivityEnterView extends FrameLayout implements
 
     public void onResume() {
         isPaused = false;
+        // Novagram: before any early return below — the mic switch may have been flipped while we were away.
+        updateVoiceDictationVisibility();
         if (hideKeyboardRunnable != null) {
             AndroidUtilities.cancelRunOnUIThread(hideKeyboardRunnable);
             hideKeyboardRunnable = null;

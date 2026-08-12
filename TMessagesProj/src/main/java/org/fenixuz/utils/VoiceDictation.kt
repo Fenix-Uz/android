@@ -88,7 +88,7 @@ class VoiceDictation(
         if (listening) return
         AndroidUtilities.cancelRunOnUIThread(restartRunnable)
         AndroidUtilities.cancelRunOnUIThread(finishRunnable)
-        if (!SpeechRecognizer.isRecognitionAvailable(activity) || !ensureRecognizer()) {
+        if (!hasRecognizer(activity) || !ensureRecognizer()) {
             listener.onUnavailable()
             return
         }
@@ -294,9 +294,52 @@ class VoiceDictation(
         private const val PREF = "db"                // device-only store shared by the other fenix toggles
         private const val KEY_FROM = "dictation_from"
         private const val KEY_TO = "dictation_to"
+        private const val KEY_MIC = "dictation_mic_enabled"
+
+        // Both answers are cached: [isMicVisible] is asked while BUILDING the composer, which happens for
+        // every chat the user opens, so it must never touch disk or PackageManager on that path.
+        @Volatile private var micEnabledCache: Boolean? = null
+        @Volatile private var recognizerCache: Boolean? = null
 
         private fun prefs(context: Context) =
             context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+
+        /** User switch for the composer mic + the chat-menu "Voice input" entry. Default ON. */
+        @JvmStatic
+        fun isMicEnabled(context: Context): Boolean =
+            micEnabledCache ?: prefs(context).getBoolean(KEY_MIC, true).also { micEnabledCache = it }
+
+        @JvmStatic
+        fun setMicEnabled(context: Context, value: Boolean) {
+            micEnabledCache = value
+            prefs(context).edit().putBoolean(KEY_MIC, value).apply()
+        }
+
+        /**
+         * Does this device have ANY speech recogniser at all? On ROMs shipped without Google services —
+         * common in our Russian user base — there is none, [start] can only ever answer onUnavailable(),
+         * and the mic is a permanently dead button. So we hide it rather than offer a control that cannot
+         * work. This is the exact same call [start] gates on, so hiding never removes working behaviour.
+         *
+         * Needs the <queries> RecognitionService entry in the manifest: under targetSdk 35 package-visibility
+         * filtering, queryIntentServices() can hide a perfectly good recogniser and we would wrongly say no.
+         *
+         * Cached — a PackageManager query whose answer cannot change without a package install, and it is
+         * asked on the composer-build path.
+         */
+        @JvmStatic
+        fun hasRecognizer(context: Context): Boolean =
+            recognizerCache ?: (try {
+                SpeechRecognizer.isRecognitionAvailable(context)
+            } catch (e: Exception) {
+                FileLog.e(e)
+                true    // fail OPEN — never hide a working mic just because the query itself blew up
+            }).also { recognizerCache = it }
+
+        /** The single gate every mic entry point asks. */
+        @JvmStatic
+        fun isMicVisible(context: Context): Boolean =
+            isMicEnabled(context) && hasRecognizer(context)
 
         /** Speak/recognition language (Telegram pluralLangCode, e.g. "en"). Empty = device default. */
         @JvmStatic
