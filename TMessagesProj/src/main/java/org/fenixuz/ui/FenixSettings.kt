@@ -513,7 +513,7 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
                         .setPositiveButton(LanguageCode.getMyTitles(323)) { _, _ ->
                             StrangerShield.setEnabled(true)
                             item.checked = true
-                            (view as NotificationsCheckCell).setChecked(true)
+                            (view as? NotificationsCheckCell)?.setChecked(true)
                             NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.dialogsNeedReload)
                         }
                         .setNegativeButton(LanguageCode.getMyTitles(80), null)

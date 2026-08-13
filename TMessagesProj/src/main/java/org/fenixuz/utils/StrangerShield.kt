@@ -31,6 +31,12 @@ import java.util.concurrent.ConcurrentHashMap
  * inbox as it is. Silently emptying the inbox is wrong too: for many users the whole point is that a
  * stranger stays filed away.
  *
+ * Switching it back ON asks NOTHING and is a clean re-arm: [clearAllowed] wipes the "Not a stranger"
+ * whitelist so every current stranger is filed again, no exceptions. That is not drift — it only happens
+ * when the user deliberately turns protection back on, which means "file all strangers" — and it doubles
+ * as the undo for a mis-tapped [trust], which is why no re-hide prompt and no reverse menu item exist.
+ * So: [trust] lasts until the next re-arm; one question total, on the OFF direction only.
+ *
  * The single source of truth is [belongsInInbox] = "a stranger AND (shield on OR captured)". Every
  * surface uses it: the dialog list (hide / inbox), notifications, and both unread badges — so they
  * never disagree (no "badge counts a chat you can't see").
@@ -116,10 +122,13 @@ object StrangerShield {
         for (a in 0 until UserConfig.MAX_ACCOUNT_COUNT) {
             if (!UserConfig.getInstance(a).isClientActivated) continue
             if (value) {
-                // The "Not a stranger" whitelist deliberately SURVIVES re-arming: a chat the user pulled
-                // out by hand must never reappear in the inbox on its own (that was the second half of the
-                // 2026-08-13 feedback). Only [trust] adds to it, and only becoming a contact / deleting the
-                // dialog removes it.
+                // Re-arming is a FRESH START — one rule, no hidden exceptions: every current stranger gets
+                // filed, including ones released with "Not a stranger" last time. They don't drift back on
+                // their own; this only runs when the user deliberately switches protection back on, which
+                // is exactly the instruction "file all strangers". It is also the undo for a mis-tapped
+                // "Not a stranger": toggle off, toggle on. Must run BEFORE the capture pass below, which
+                // skips whitelisted ids.
+                clearAllowed(a)
                 // Turning ON: file every current stranger into the inbox, and clear any
                 // notification/app-badge they already accumulated.
                 captureCurrentStrangers(a)
@@ -234,6 +243,13 @@ object StrangerShield {
         saveCaptured(account)
         // The bottom "Chats" badge subtracted these while they were inboxed — put them back.
         MessagesStorage.getInstance(account).fenixRecalcMainUnread()
+    }
+
+    /** Forget every "Not a stranger" whitelist entry for [account] (called when protection is re-armed). */
+    private fun clearAllowed(account: Int) {
+        if (allowed[account].isEmpty()) return
+        allowed[account].clear()
+        saveAllowed(account)
     }
 
     /** Same bounding as [pruneCaptured]: drop whitelisted ids that became contacts or whose dialog is gone. */
