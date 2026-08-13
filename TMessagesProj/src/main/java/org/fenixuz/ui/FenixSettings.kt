@@ -387,6 +387,23 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
         return LanguageCode.getMyTitles(274) + ": " + tone
     }
 
+    /**
+     * Switch the shield off, optionally emptying the inbox back into the main list. Order matters:
+     * [StrangerShield.setEnabled] prunes and recomputes the badge first, then the release clears the set
+     * and recomputes again — so the final numbers are the released ones.
+     */
+    private fun disableStrangerShield(item: UItem, view: View, release: Boolean) {
+        StrangerShield.setEnabled(false)
+        if (release) {
+            StrangerShield.releaseCaptured(currentAccount)
+        }
+        item.checked = false
+        // Animate the switch itself, then rebuild so the "Stranger chats" unread badge follows too.
+        (view as? NotificationsCheckCell)?.setChecked(false)
+        listView?.adapter?.update(true)
+        NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.dialogsNeedReload)
+    }
+
     override fun onClick(item: UItem, view: View, position: Int, x: Float, y: Float) {
         when (item.id) {
             EDIT_SAVE -> {
@@ -502,9 +519,34 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
                         .setNegativeButton(LanguageCode.getMyTitles(80), null)
                         .show()
                 } else {
-                    StrangerShield.setEnabled(false)
-                    (view as NotificationsCheckCell).setChecked(false)
-                    NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.dialogsNeedReload)
+                    // Turning OFF is NOT the mirror of turning ON: chats captured while the shield was on
+                    // stay in the inbox. Never do that silently — ask, or the user turns the switch off,
+                    // sees nothing come back and reports it as a bug.
+                    val pending = StrangerShield.countCaptured(currentAccount)
+                    val context = parentActivity
+                    if (pending > 0 && context != null) {
+                        // Back / tap-outside must still honour the tap on the switch, or the toggle looks
+                        // dead. It falls through to the safe branch — shield off, inbox untouched — which is
+                        // fully reversible: re-arming re-files exactly the same chats.
+                        var handled = false
+                        AlertDialog.Builder(context)
+                            .setTitle(LanguageCode.getMyTitles(319))
+                            .setMessage(LanguageCode.getMyTitles(383).replace("%d", pending.toString()))
+                            .setPositiveButton(LanguageCode.getMyTitles(384)) { _, _ ->
+                                handled = true
+                                disableStrangerShield(item, view, release = true)
+                            }
+                            .setNegativeButton(LanguageCode.getMyTitles(385)) { _, _ ->
+                                handled = true
+                                disableStrangerShield(item, view, release = false)
+                            }
+                            .setOnDismissListener { _ ->
+                                if (!handled) disableStrangerShield(item, view, release = false)
+                            }
+                            .show()
+                    } else {
+                        disableStrangerShield(item, view, release = false)
+                    }
                 }
             }
             STRANGER_INBOX -> {

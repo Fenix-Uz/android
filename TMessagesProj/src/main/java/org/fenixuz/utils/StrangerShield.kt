@@ -25,6 +25,12 @@ import java.util.concurrent.ConcurrentHashMap
  * main list normally (capturing only happens while protection is on). If a captured stranger later
  * becomes a contact, [isStranger] turns false and they leave the inbox / reappear in the main list.
  *
+ * Because "off" is therefore NOT symmetric with "on", switching the shield OFF must ASK (user feedback
+ * 2026-08-13: people turned it off, saw nothing come back and read it as a bug). The settings toggle
+ * shows [countCaptured] and offers [releaseCaptured] — "return them to the main list" — or keeping the
+ * inbox as it is. Silently emptying the inbox is wrong too: for many users the whole point is that a
+ * stranger stays filed away.
+ *
  * The single source of truth is [belongsInInbox] = "a stranger AND (shield on OR captured)". Every
  * surface uses it: the dialog list (hide / inbox), notifications, and both unread badges — so they
  * never disagree (no "badge counts a chat you can't see").
@@ -110,11 +116,10 @@ object StrangerShield {
         for (a in 0 until UserConfig.MAX_ACCOUNT_COUNT) {
             if (!UserConfig.getInstance(a).isClientActivated) continue
             if (value) {
-                // Re-arming protection is a fresh start: forget the previous "Not a stranger" whitelist so
-                // every current stranger — INCLUDING ones the user let out last time — is filed again. (This
-                // only runs on a real OFF→ON toggle; without a re-toggle the whitelist stays and trusted
-                // chats never return.)
-                clearAllowed(a)
+                // The "Not a stranger" whitelist deliberately SURVIVES re-arming: a chat the user pulled
+                // out by hand must never reappear in the inbox on its own (that was the second half of the
+                // 2026-08-13 feedback). Only [trust] adds to it, and only becoming a contact / deleting the
+                // dialog removes it.
                 // Turning ON: file every current stranger into the inbox, and clear any
                 // notification/app-badge they already accumulated.
                 captureCurrentStrangers(a)
@@ -191,11 +196,44 @@ object StrangerShield {
         prefs().edit().putString(keyForAllowed(account), allowed[account].joinToString(",")).apply()
     }
 
-    /** Forget every "Not a stranger" whitelist entry for [account] (called when protection is re-armed). */
-    private fun clearAllowed(account: Int) {
-        if (allowed[account].isEmpty()) return
-        allowed[account].clear()
-        saveAllowed(account)
+    /**
+     * How many chats [account]'s inbox is currently holding on to purely because they were captured —
+     * i.e. how many would come back to the main list if the shield were switched off and released. Uses
+     * the same keep-rule as [pruneCaptured], so the number the user is shown matches what actually moves.
+     */
+    @JvmStatic
+    fun countCaptured(account: Int): Int {
+        ensureLoaded()
+        val set = captured[account]
+        if (set.isEmpty()) return 0
+        return try {
+            val mc = MessagesController.getInstance(account)
+            var c = 0
+            for (id in set) {
+                val user = mc.getUser(id)
+                // Not loaded yet (cold start) but the dialog exists → still counts, same as [pruneCaptured].
+                if (if (user != null) isStranger(user) else mc.dialogs_dict.get(id) != null) c++
+            }
+            c
+        } catch (e: Exception) {
+            FileLog.e(e)
+            set.size
+        }
+    }
+
+    /**
+     * "Return them to the main list": empty [account]'s inbox. Only the captured set is dropped — the
+     * per-chat "Not a stranger" whitelist is untouched, and re-arming the shield later files these chats
+     * again (that is the difference between this and [trust]). Caller reloads the dialog list.
+     */
+    @JvmStatic
+    fun releaseCaptured(account: Int) {
+        ensureLoaded()
+        if (captured[account].isEmpty()) return
+        captured[account].clear()
+        saveCaptured(account)
+        // The bottom "Chats" badge subtracted these while they were inboxed — put them back.
+        MessagesStorage.getInstance(account).fenixRecalcMainUnread()
     }
 
     /** Same bounding as [pruneCaptured]: drop whitelisted ids that became contacts or whose dialog is gone. */

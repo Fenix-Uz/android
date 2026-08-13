@@ -1747,6 +1747,12 @@ object LanguageCode {
         titlesLanguages.add(TitleLanguages(380, "Message field", "Xabar maydoni", "Поле сообщения"))
         titlesLanguages.add(TitleLanguages(381, "Voice input button", "Ovozli kiritish tugmasi", "Кнопка голосового ввода"))
         titlesLanguages.add(TitleLanguages(382, "Show the microphone next to the message field to dictate text instead of typing. Turn it off to free up space in the field. Hidden automatically on devices without speech recognition.", "Yozish o'rniga gapirib matn kiritish uchun xabar maydoni yonida mikrofonni ko'rsatadi. O'chirsangiz maydonda joy bo'shaydi. Nutqni tanimaydigan qurilmalarda avtomatik yashiriladi.", "Показывать микрофон рядом с полем сообщения, чтобы диктовать текст вместо набора. Выключите, чтобы освободить место в поле. На устройствах без распознавания речи скрывается автоматически."))
+        // Asked when protection is switched OFF and the inbox still holds captured chats. %d is replaced
+        // with the count — keep the placeholder in every translation.
+        titlesLanguages.add(TitleLanguages(383, "\"Stranger chats\" still holds %d chats. Return them to your main list?", "\"Begona suhbatlar\"da hali %d ta suhbat bor. Ularni asosiy ro'yxatga qaytaramizmi?", "В \"Чатах незнакомцев\" ещё %d чатов. Вернуть их в основной список?"))
+        titlesLanguages.add(TitleLanguages(384, "Return", "Qaytarish", "Вернуть"))
+        // Deliberately short — two long button labels wrap badly in the alert on narrow screens.
+        titlesLanguages.add(TitleLanguages(385, "Keep", "Qolsin", "Оставить"))
     }
 
     init {
