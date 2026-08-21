@@ -358,7 +358,7 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
         items.add(UItem.asHeader(LanguageCode.getMyTitles(318)))
         items.add(
             UItem.asButtonCheck(STRANGER_SHIELD, LanguageCode.getMyTitles(319), LanguageCode.getMyTitles(320))
-                .setChecked(StrangerShield.isEnabled())
+                .setChecked(StrangerShield.isEnabled(currentAccount))
         )
         // A "Stranger chats" inbox — opens a Chats-like screen listing the hidden non-contact chats,
         // so nothing is lost: you can read and reply from there. Reachable even when the toggle is off.
@@ -393,7 +393,7 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
      * and recomputes again — so the final numbers are the released ones.
      */
     private fun disableStrangerShield(item: UItem, view: View, release: Boolean) {
-        StrangerShield.setEnabled(false)
+        StrangerShield.setEnabled(currentAccount, false)
         if (release) {
             StrangerShield.releaseCaptured(currentAccount)
         }
@@ -503,7 +503,7 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
             REMINDER_DELAY -> showReminderDelayPicker()
             REMINDER_SOUND -> showReminderSoundPicker()
             STRANGER_SHIELD -> {
-                if (!StrangerShield.isEnabled()) {
+                if (!StrangerShield.isEnabled(currentAccount)) {
                     // Turning ON: explain exactly what happens, then ask for consent — so the user is
                     // never surprised that chats "disappeared" or that a message was silenced.
                     val context = parentActivity ?: return
@@ -511,7 +511,7 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
                         .setTitle(LanguageCode.getMyTitles(319))
                         .setMessage(LanguageCode.getMyTitles(322))
                         .setPositiveButton(LanguageCode.getMyTitles(323)) { _, _ ->
-                            StrangerShield.setEnabled(true)
+                            StrangerShield.setEnabled(currentAccount, true)
                             item.checked = true
                             (view as? NotificationsCheckCell)?.setChecked(true)
                             NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.dialogsNeedReload)

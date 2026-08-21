@@ -1330,7 +1330,7 @@ public class NotificationsController extends BaseController implements Notificat
                     if (canAddValue && DialogObject.isUserDialog(dialog_id)) {
                         TLRPC.User fenixUser = getMessagesController().getUser(dialog_id);
                         if (org.fenixuz.utils.StrangerShield.isStranger(fenixUser)) {
-                            if (org.fenixuz.utils.StrangerShield.isEnabled()) {
+                            if (org.fenixuz.utils.StrangerShield.isEnabled(currentAccount)) {
                                 org.fenixuz.utils.StrangerShield.capture(currentAccount, dialog_id);
                             }
                             if (org.fenixuz.utils.StrangerShield.belongsInInbox(currentAccount, fenixUser, dialog_id)) {
@@ -4815,7 +4815,7 @@ public class NotificationsController extends BaseController implements Notificat
             }
             // Novagram "Protect from strangers": stay silent for a private DM from a non-contact
             // (chat == null → one-on-one; groups still notify even if a stranger posts in them).
-            if (org.fenixuz.utils.StrangerShield.isEnabled() && chat == null && org.fenixuz.utils.StrangerShield.isStranger(user)) {
+            if (org.fenixuz.utils.StrangerShield.isEnabled(currentAccount) && chat == null && org.fenixuz.utils.StrangerShield.isStranger(user)) {
                 return;
             }
             showExtraNotifications(mBuilder, detailText, dialog_id, topicId, chatName, vibrationPattern, ledColor, sound, configImportance, isDefault, isInApp, notifyDisabled, chatType);

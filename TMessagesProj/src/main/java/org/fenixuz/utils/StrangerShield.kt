@@ -12,6 +12,7 @@ import org.telegram.messenger.UserConfig
 import org.telegram.messenger.UserObject
 import org.telegram.tgnet.TLRPC
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicIntegerArray
 
 /**
  * Novagram "Protect from strangers" — one-on-one chats with people NOT in your contacts (not bots,
@@ -41,28 +42,41 @@ import java.util.concurrent.ConcurrentHashMap
  * surface uses it: the dialog list (hide / inbox), notifications, and both unread badges — so they
  * never disagree (no "badge counts a chat you can't see").
  *
- * The captured set is PER-ACCOUNT (2026-06-15): dialog ids are account-scoped, so the same id being a
- * stranger in account A must never hide it in account B. The set is also self-pruned on every toggle —
- * ids whose user became a contact or whose dialog was deleted are dropped — so it can't grow forever.
+ * EVERYTHING is PER-ACCOUNT — the switch as well as the sets (the sets since 2026-06-15, the switch
+ * since 2026-08-13). Dialog ids are account-scoped, so the same id being a stranger in account A must
+ * never hide it in account B; and the switch has to match, because a global switch sitting on top of
+ * per-account sets is what made "turn it off" reachable for the current account only. It is also the
+ * useful shape: strangers writing to a work account is the point, on a personal account it isn't. The
+ * sets are self-pruned on every toggle — ids whose user became a contact or whose dialog was deleted
+ * are dropped — so they can't grow forever.
  *
  * Clean, optimised rewrite of pro's `MyContact` (which mutated storage on the render hot path with
  * Gson + blocking commit(), filtered in two places with O(N·M) loops, faked a paid-message cost,
- * spammed per-stranger network mutes, and force-enabled unrelated features). Here: one cached boolean
- * + lock-free per-account captured sets, O(1) hot-path reads, async writes, no network, device-only.
+ * spammed per-stranger network mutes, and force-enabled unrelated features). Here: a lock-free flag +
+ * per-account captured sets, O(1) hot-path reads, async writes, no network, device-only.
  */
 object StrangerShield {
 
     private const val PREF = "db"
-    private const val KEY = "stranger_shield"
+    private const val KEY_ENABLED_PREFIX = "stranger_shield_"
     private const val KEY_CAPTURED_PREFIX = "stranger_captured_"
     private const val KEY_ALLOWED_PREFIX = "stranger_allowed_"
     // Old single global set (pre per-account). Migrated into account 0 once, then removed.
     private const val KEY_CAPTURED_LEGACY = "stranger_captured"
+    // Old single global switch (pre per-account). NOT migrated-and-deleted but kept forever as the
+    // DEFAULT for any account that has no key of its own: eager migration would have to enumerate
+    // activated accounts, and [ensureLoaded] can run before they are activated — an account missed
+    // there would silently lose its protection and start showing/notifying stranger chats again.
+    // As a default it is also right for an account added later: the user asked for protection once.
+    private const val KEY_ENABLED_LEGACY = "stranger_shield"
 
     @Volatile
     private var loaded = false
-    @Volatile
-    private var enabled = false
+
+    // Per-account switch. Read from the UI thread (dialog list), the notifications queue and the storage
+    // queue, written from the UI thread — an AtomicIntegerArray (0/1) gives every element the visibility
+    // a plain BooleanArray element would NOT have, at the cost of an ordinary volatile read.
+    private val enabled = AtomicIntegerArray(UserConfig.MAX_ACCOUNT_COUNT)
 
     // Per-account inbox membership. Read on the UI thread (dialog list) AND background threads
     // (notifications/badge), written from both → a lock-free concurrent set per account.
@@ -78,14 +92,18 @@ object StrangerShield {
 
     private fun keyFor(account: Int) = KEY_CAPTURED_PREFIX + account
     private fun keyForAllowed(account: Int) = KEY_ALLOWED_PREFIX + account
+    private fun keyForEnabled(account: Int) = KEY_ENABLED_PREFIX + account
 
     private fun ensureLoaded() {
         if (loaded) return
         synchronized(this) {
             if (loaded) return
             val p = prefs()
-            enabled = p.getBoolean(KEY, false)
+            // Anyone who had the old global switch on keeps protection on every account until they say
+            // otherwise; a per-account key, once written, always wins over it.
+            val legacyEnabled = p.getBoolean(KEY_ENABLED_LEGACY, false)
             for (a in 0 until UserConfig.MAX_ACCOUNT_COUNT) {
+                if (p.getBoolean(keyForEnabled(a), legacyEnabled)) enabled.set(a, 1)
                 val raw = p.getString(keyFor(a), "") ?: ""
                 if (raw.isNotEmpty()) {
                     for (s in raw.split(',')) s.toLongOrNull()?.let { captured[a].add(it) }
@@ -106,44 +124,38 @@ object StrangerShield {
         }
     }
 
-    /** O(1) cached hot-path read. The toggle is global (one switch for the whole app). */
+    /** O(1) cached hot-path read for [account] — a volatile read, never disk. */
     @JvmStatic
-    fun isEnabled(): Boolean {
+    fun isEnabled(account: Int): Boolean {
         ensureLoaded()
-        return enabled
+        return enabled.get(account) == 1
     }
 
     @JvmStatic
-    fun setEnabled(value: Boolean) {
+    fun setEnabled(account: Int, value: Boolean) {
         ensureLoaded()
-        if (enabled == value) return
-        enabled = value
-        prefs().edit().putBoolean(KEY, value).apply()   // async, no ANR
-        for (a in 0 until UserConfig.MAX_ACCOUNT_COUNT) {
-            if (!UserConfig.getInstance(a).isClientActivated) continue
-            if (value) {
-                // Re-arming is a FRESH START — one rule, no hidden exceptions: every current stranger gets
-                // filed, including ones released with "Not a stranger" last time. They don't drift back on
-                // their own; this only runs when the user deliberately switches protection back on, which
-                // is exactly the instruction "file all strangers". It is also the undo for a mis-tapped
-                // "Not a stranger": toggle off, toggle on. Must run BEFORE the capture pass below, which
-                // skips whitelisted ids.
-                clearAllowed(a)
-                // Turning ON: file every current stranger into the inbox, and clear any
-                // notification/app-badge they already accumulated.
-                captureCurrentStrangers(a)
-                NotificationsController.getInstance(a).fenixDismissStrangers()
-            }
-            // Drop ids that are no longer strangers / no longer exist — keeps both sets bounded.
-            pruneCaptured(a)
-            pruneAllowed(a)
-            // Recompute the bottom "Chats" tab badge (drops strangers on, restores non-captured off).
-            MessagesStorage.getInstance(a).fenixRecalcMainUnread()
+        if (isEnabled(account) == value) return
+        enabled.set(account, if (value) 1 else 0)
+        prefs().edit().putBoolean(keyForEnabled(account), value).apply()   // async, no ANR
+        if (value) {
+            // Re-arming is a FRESH START — one rule, no hidden exceptions: every current stranger gets
+            // filed, including ones released with "Not a stranger" last time. They don't drift back on
+            // their own; this only runs when the user deliberately switches protection back on, which
+            // is exactly the instruction "file all strangers". It is also the undo for a mis-tapped
+            // "Not a stranger": toggle off, toggle on. Must run BEFORE the capture pass below, which
+            // skips whitelisted ids.
+            clearAllowed(account)
+            // Turning ON: file every current stranger into the inbox, and clear any
+            // notification/app-badge they already accumulated.
+            captureCurrentStrangers(account)
+            NotificationsController.getInstance(account).fenixDismissStrangers()
         }
+        // Drop ids that are no longer strangers / no longer exist — keeps both sets bounded.
+        pruneCaptured(account)
+        pruneAllowed(account)
+        // Recompute the bottom "Chats" tab badge (drops strangers on, restores non-captured off).
+        MessagesStorage.getInstance(account).fenixRecalcMainUnread()
     }
-
-    @JvmStatic
-    fun toggle() = setEnabled(!isEnabled())
 
     /**
      * A real non-bot user who is NOT in your contacts and NOT yourself (Saved Messages never hidden).
@@ -164,7 +176,7 @@ object StrangerShield {
     fun belongsInInbox(account: Int, user: TLRPC.User?, dialogId: Long): Boolean {
         if (!isStranger(user)) return false
         if (allowed[account].contains(dialogId)) return false   // explicitly trusted → always in main list
-        return isEnabled() || captured[account].contains(dialogId)
+        return isEnabled(account) || captured[account].contains(dialogId)
     }
 
     /**
@@ -359,7 +371,7 @@ object StrangerShield {
     fun countInboxedUnreadChats(account: Int): Int {
         ensureLoaded()
         val set = captured[account]
-        if (enabled || set.isEmpty()) return 0
+        if (isEnabled(account) || set.isEmpty()) return 0
         return try {
             val mc = MessagesController.getInstance(account)
             val countMuted = NotificationsController.getInstance(account).showBadgeMuted

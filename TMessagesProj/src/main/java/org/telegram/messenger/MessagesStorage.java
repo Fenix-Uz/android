@@ -2966,7 +2966,7 @@ public class MessagesStorage extends BaseController {
                 // their unread shouldn't add to the bottom "Chats" tab counter. Custom folders (a < N)
                 // and the archive counter are left untouched.
                 if ((flags & MessagesController.DIALOG_FILTER_FLAG_NON_CONTACTS) != 0
-                        && !(a == N && org.fenixuz.utils.StrangerShield.isEnabled())) {
+                        && !(a == N && org.fenixuz.utils.StrangerShield.isEnabled(currentAccount))) {
                     if ((flags & MessagesController.DIALOG_FILTER_FLAG_ONLY_ARCHIVED) == 0) {
                         unreadCount += nonContacts[0][0];
                         if ((flags & MessagesController.DIALOG_FILTER_FLAG_EXCLUDE_MUTED) == 0) {
@@ -6516,7 +6516,7 @@ public class MessagesStorage extends BaseController {
                 // their unread shouldn't add to the bottom "Chats" tab counter. Custom folders (a < N)
                 // and the archive counter are left untouched.
                 if ((flags & MessagesController.DIALOG_FILTER_FLAG_NON_CONTACTS) != 0
-                        && !(a == N && org.fenixuz.utils.StrangerShield.isEnabled())) {
+                        && !(a == N && org.fenixuz.utils.StrangerShield.isEnabled(currentAccount))) {
                     if ((flags & MessagesController.DIALOG_FILTER_FLAG_ONLY_ARCHIVED) == 0) {
                         unreadCount += nonContacts[0][0];
                         if ((flags & MessagesController.DIALOG_FILTER_FLAG_EXCLUDE_MUTED) == 0) {

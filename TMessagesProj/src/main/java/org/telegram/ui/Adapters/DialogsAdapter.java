@@ -1639,11 +1639,11 @@ public class DialogsAdapter extends RecyclerListView.SelectionAdapter implements
         // filed in the inbox even after the shield is turned off.
         final boolean fenixStrangerInbox = parentFragment != null && parentFragment.isFenixStrangerInbox();
         if (dialogsType == DialogsActivity.DIALOGS_TYPE_DEFAULT
-                && (fenixStrangerInbox || org.fenixuz.utils.StrangerShield.isEnabled() || org.fenixuz.utils.StrangerShield.hasCaptured(currentAccount))) {
+                && (fenixStrangerInbox || org.fenixuz.utils.StrangerShield.isEnabled(currentAccount) || org.fenixuz.utils.StrangerShield.hasCaptured(currentAccount))) {
             if (fenixStrangerInbox) {
                 hasHints = false;
             }
-            final boolean shieldOn = org.fenixuz.utils.StrangerShield.isEnabled();
+            final boolean shieldOn = org.fenixuz.utils.StrangerShield.isEnabled(currentAccount);
             ArrayList<TLRPC.Dialog> fenixResult = new ArrayList<>(array.size());
             for (int a = 0, N = array.size(); a < N; a++) {
                 TLRPC.Dialog d = array.get(a);
