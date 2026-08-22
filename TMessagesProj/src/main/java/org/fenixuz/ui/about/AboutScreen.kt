@@ -430,7 +430,7 @@ class AboutScreen : BaseFragment() {
     companion object {
         /** Telegram upstream this fork is built on. Bump only when we actually merge a newer Telegram base. */
         private const val TELEGRAM_BASE = "12.9.0"
-        private const val SUPPORT_ADMIN = "novagramadmin"
+        private const val SUPPORT_ADMIN = "Avazbekedu"
         private const val COMPANY_NAME = "VipAds LLC"
         private const val COMPANY_EMAIL = "admin@novagram.org"
         /** Published store package IDs — fixed, so the review link never breaks on a suffixed debug build. */
