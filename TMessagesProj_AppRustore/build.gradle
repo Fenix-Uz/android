@@ -23,7 +23,7 @@ dependencies {
 }
 
 android {
-    compileSdkVersion 35
+    compileSdkVersion 36
     buildToolsVersion '35.0.0'
 
     defaultConfig.applicationId = "org.messenger_pro.messenger"
@@ -121,7 +121,7 @@ android {
 
     defaultConfig {
         minSdkVersion 21
-        targetSdkVersion 35
+        targetSdkVersion 36
         versionName getRustoreVersionName()
         ndkVersion "21.4.7075529"
 
