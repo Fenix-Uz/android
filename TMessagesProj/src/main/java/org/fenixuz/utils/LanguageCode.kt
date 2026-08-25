@@ -460,9 +460,11 @@ object LanguageCode {
         titlesLanguages.add(
             TitleLanguages(
                 72,
-                "\uD83D\uDE31 Now they can't deceive you! With the ability to save any edited messages, the true information will always be at your fingertips.",
-                "\uD83D\uDE31Endi sizni aldasha olmaydi! Har qanday tahrirlangan xabarlarni saqlab qolish imkoniyati bilan, haqiqiy ma'lumot doimo sizning qo'lingizda.",
-                "\uD83D\uDE31 Теперь вас не обмануть! С возможностью сохранить любые отредактированные сообщения, истинная информация всегда будет у вас под рукой."
+                // The menu entry is R.string.WebHistory ("History") in ChatActivity's message options;
+                // name it, or the instruction stops halfway and the user is left looking for it.
+                "Keep the earlier versions of messages that someone edits. To read them, press and hold the message and choose History.",
+                "Kimdir tahrirlagan xabarlarning oldingi variantlarini saqlab qoladi. O'qish uchun xabarni bosib turing va «Tarix» ni tanlang.",
+                "Сохраняет прежние версии сообщений, которые кто-то отредактировал. Чтобы их прочитать, нажмите и удерживайте сообщение и выберите «История»."
             )
         )
         titlesLanguages.add(
@@ -888,17 +890,17 @@ object LanguageCode {
         titlesLanguages.add(
             TitleLanguages(
                 136,
-                "Hide Story",
-                "Hikoyani Yashirish",
+                "Hide stories",
+                "Hikoyalarni yashirish",
                 "Скрыть истории"
             )
         )
         titlesLanguages.add(
             TitleLanguages(
                 137,
-                "If you don't want to see stories in the main window, hide them.",
-                "Asosiy oynada hikoyalarni ko'rishni xoxlamasangiz ularni yashirib qoying",
-                "Если вы не хотите видеть истории в главном окне, скройте их."
+                "Hide the stories tray at the top of the chat list.",
+                "Suhbatlar ro'yxati tepasidagi hikoyalar tasmasini yashiradi.",
+                "Скрывает ленту историй вверху списка чатов."
             )
         )
         titlesLanguages.add(TitleLanguages(138, "Promo code", "Promo kod", "Промо-код"))
@@ -1160,25 +1162,25 @@ object LanguageCode {
         titlesLanguages.add(
             TitleLanguages(
                 191,
-                "ask for approval before sending a sticker",
-                "Sticker yuborishdan oldin tasdiqlashni so'rash",
-                "Спрашивать подтверждение перед отправкой стикера"
+                "Ask for confirmation before sending a sticker",
+                "Stiker yuborishdan oldin tasdiqlashni so'raydi",
+                "Спрашивает подтверждение перед отправкой стикера"
             )
         )
         titlesLanguages.add(
             TitleLanguages(
                 192,
-                "ask for approval before sending a voice",
-                "Ovoz yuborishdan oldin tasdiqlashni so'rash",
-                "Спрашивать подтверждение перед отправкой голосового"
+                "Ask for confirmation before sending a voice message",
+                "Ovozli xabar yuborishdan oldin tasdiqlashni so'raydi",
+                "Спрашивает подтверждение перед отправкой голосового сообщения"
             )
         )
         titlesLanguages.add(
             TitleLanguages(
                 193,
-                "ask for approval before sending a gif",
-                "Gif yuborishdan oldin tasdiqlashni so'rash",
-                "Спрашивать подтверждение перед отправкой GIF"
+                "Ask for confirmation before sending a GIF",
+                "GIF yuborishdan oldin tasdiqlashni so'raydi",
+                "Спрашивает подтверждение перед отправкой GIF"
             )
         )
         titlesLanguages.add(
@@ -1200,9 +1202,9 @@ object LanguageCode {
         titlesLanguages.add(
             TitleLanguages(
                 196,
-                "Stop auto-downloading will stop all videos, images, audio, and other content from automatically downloading when you enter this chat! This prevents traffic consumption and memory overflow.",
-                "Auto yuklab olishni to'xtatish bu suhbatga kirganda barcha video, rasm, ovoz va boshqa contentlarni automatik yuklab olishni to'xtatadi! Bu ko'p trafik sarfi va qurilma xotirasining to'lishini oldini oladi.",
-                "Остановка автоматической загрузки остановит автоматическую загрузку всех видео, изображений, аудио и другого контента при входе в этот чат! Это предотвращает потребление трафика и переполнение памяти."
+                "Turn off automatic downloading of photos, videos and files in every chat on this account. Saves mobile data and storage — you can still download anything by tapping it.",
+                "Bu akkauntdagi barcha suhbatlarda rasm, video va fayllarning avtomatik yuklanishini o'chiradi. Trafik va xotirani tejaydi — kerakli faylni ustiga bosib baribir yuklab olasiz.",
+                "Отключает автозагрузку фото, видео и файлов во всех чатах этого аккаунта. Экономит трафик и память — любой файл всё равно можно загрузить нажатием."
             )
         )
         titlesLanguages.add(
@@ -1370,9 +1372,11 @@ object LanguageCode {
         titlesLanguages.add(
             TitleLanguages(
                 217,
-                "With this feature, you can hide your Dialogs from strangers in Secret chat! Most importantly, you can set numeric, alphanumeric, or fingerprint passwords to access it. To open Secret chat, press and hold New messages or the Pencil button in the Dialogs window and it will open",
-                "Ushbu funksiya yordamida siz Dialoglaringizni Yashirin suhbatda begonalardan yashirishingiz mumkun! Eng asosiysi unga kirish uchun raqamli, harfli, barmoq izi parollarini o'rnatishingiz mumkun. Yashirin suhbatni ochish uchun Dialoglar oynasidan Yangi xabarlar yoki Qalamcha tugmasini bosib turing va u ochiladi",
-                "С помощью этой функции вы можете скрыть свои диалоги от посторонних в «Секретном чате»! И самое главное, вы можете установить для доступа к нему цифровые, буквенно-цифровые или отпечатковые пароли. Чтобы открыть секретный чат, нажмите и удерживайте кнопку «Новые сообщения» или кнопку с карандашом в окне диалогов, и он откроется."
+                // Both gestures are named end to end on purpose. The action in the selection menu is
+                // getMyTitles(215) — "Add to secret chat" (DialogsActivity.secretChatItem).
+                "Move chats into a hidden folder locked with a password, PIN or fingerprint. To hide a chat, press and hold it and choose Add to secret chat. To open the folder, press and hold the app name at the top of the chat list.",
+                "Suhbatlarni parol, PIN yoki barmoq izi bilan qulflangan yashirin jildga ko'chiradi. Suhbatni yashirish uchun uni bosib turing va «Yashirin suhbatga qo'shing» ni tanlang. Jildni ochish uchun suhbatlar ro'yxati tepasidagi ilova nomini bosib turing.",
+                "Переносит чаты в скрытую папку под паролем, PIN-кодом или отпечатком пальца. Чтобы скрыть чат, нажмите и удерживайте его и выберите «Добавить в секретный чат». Чтобы открыть папку, нажмите и удерживайте название приложения вверху списка чатов."
             )
         )
         titlesLanguages.add(
@@ -1573,9 +1577,11 @@ object LanguageCode {
         titlesLanguages.add(
             TitleLanguages(
                 241,
-                "Show chat folder tabs as icons. Tap a folder while editing it to pick a custom icon.",
-                "Suhbat jild tablarini ikonka ko'rinishida ko'rsatadi. Maxsus ikonka tanlash uchun jildni tahrirlashda ustiga bosing.",
-                "Показывать вкладки папок в виде иконок. Чтобы выбрать иконку, нажмите на папку при её редактировании."
+                // The picker hangs off the icon button beside the name field on the folder edit screen
+                // (FilterCreateActivity), not off the folder row itself — say exactly where to tap.
+                "Show chat folder tabs as icons instead of names. To change a folder's icon, open its settings and tap the icon next to the name.",
+                "Suhbat jild tablarini nom o'rniga ikonka ko'rinishida ko'rsatadi. Jild ikonkasini o'zgartirish uchun uning sozlamalarini ochib, nom yonidagi ikonkani bosing.",
+                "Показывает вкладки папок значками вместо названий. Чтобы сменить значок папки, откройте её настройки и нажмите на значок рядом с названием."
             )
         )
         titlesLanguages.add(
@@ -1682,7 +1688,10 @@ object LanguageCode {
         titlesLanguages.add(TitleLanguages(315, "Off", "O'chiq", "Выкл"))
         titlesLanguages.add(TitleLanguages(316, "Start", "Boshlash", "Начать"))
         titlesLanguages.add(TitleLanguages(317, "Translation failed", "Tarjima qilinmadi", "Не удалось перевести"))
-        titlesLanguages.add(TitleLanguages(318, "Privacy", "Maxfiylik", "Конфиденциальность"))
+        // Section header for "protect from strangers" + "block APK files". Was a second "Privacy",
+        // identical to the Ghost/Secret-chat section above it; both rows here guard against someone
+        // else reaching you, so Security separates them without repeating the row wording.
+        titlesLanguages.add(TitleLanguages(318, "Security", "Xavfsizlik", "Безопасность"))
         titlesLanguages.add(TitleLanguages(319, "Protect from strangers", "Begonalardan himoya", "Защита от незнакомцев"))
         titlesLanguages.add(TitleLanguages(320, "Hide chats and mute notifications from people not in your contacts", "Kontaktingizda yo'q odamlarning suhbatlarini yashiradi va bildirishnomalarini o'chiradi", "Скрывает чаты и отключает уведомления от людей не из ваших контактов"))
         titlesLanguages.add(TitleLanguages(321, "Stranger chats", "Begona suhbatlar", "Чаты незнакомцев"))
@@ -1753,6 +1762,9 @@ object LanguageCode {
         titlesLanguages.add(TitleLanguages(384, "Return", "Qaytarish", "Вернуть"))
         // Deliberately short — two long button labels wrap badly in the alert on narrow screens.
         titlesLanguages.add(TitleLanguages(385, "Keep", "Qolsin", "Оставить"))
+        // Tour body for the confirmation-dialogs group. The three rows there differ by one word, so the
+        // walkthrough covers them in a single stop rather than three near-identical coach marks.
+        titlesLanguages.add(TitleLanguages(386, "Ask for confirmation before sending a sticker, voice message or GIF, so nothing goes out by accident.", "Stiker, ovozli xabar yoki GIF yuborishdan oldin tasdiqlashni so'raydi — tasodifan yuborib qo'ymaysiz.", "Спрашивает подтверждение перед отправкой стикера, голосового сообщения или GIF — ничего не уйдёт случайно."))
     }
 
     init {
