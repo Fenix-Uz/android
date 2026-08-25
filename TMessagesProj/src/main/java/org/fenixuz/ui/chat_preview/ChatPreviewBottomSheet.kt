@@ -221,8 +221,12 @@ class ChatPreviewBottomSheet(
     private fun setupHeader() {
         val headerLayout = object : FrameLayout(context) {
             override fun onDraw(canvas: Canvas) {
+                // Messages scroll underneath this header (the list keeps a 58dp top padding with
+                // clipToPadding = false), so whatever alpha is left here is filled in by moving message
+                // bubbles and the chat wallpaper. At the original 80% that was enough to wash the name and
+                // the online line out on busy wallpapers - keep the layered look, but only just.
                 val color = Theme.getColor(Theme.key_windowBackgroundWhite)
-                canvas.drawColor((color and 0x00ffffff) or -0x35000000)
+                canvas.drawColor((color and 0x00ffffff) or HEADER_SCRIM_ALPHA)
                 super.onDraw(canvas)
             }
         }
@@ -241,7 +245,10 @@ class ChatPreviewBottomSheet(
         nameTextView = SimpleTextView(context).apply {
             setTextSize(17)
             setTypeface(Typeface.DEFAULT_BOLD)
-            setTextColor(Theme.getColor(Theme.key_chats_menuItemText))
+            // Must be the key that pairs with the header's windowBackgroundWhite base. chats_menuItemText
+            // belongs to the navigation drawer, and themes that give the drawer a dark photo background set
+            // it to white - which rendered the name white-on-white here.
+            setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText))
         }
         subtitleTextView = SimpleTextView(context).apply {
             setTextSize(14)
@@ -671,5 +678,8 @@ class ChatPreviewBottomSheet(
         const val COUNT_TO_LOAD = 100
         const val PAGE_SIZE = 50
         const val LOAD_MORE_THRESHOLD = 5
+
+        /** Alpha of the header scrim: 0xF0 = 94%, dense enough to read over any wallpaper. */
+        const val HEADER_SCRIM_ALPHA = 0xF0000000.toInt()
     }
 }
