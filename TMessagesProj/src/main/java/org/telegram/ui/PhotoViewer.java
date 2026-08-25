@@ -364,7 +364,15 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
 
     private boolean muteVideo;
     private boolean sendAsRoundVideo; // Novagram: current video will be sent as a round video note
-    private float roundVideoPixelWidthHeightRatio = 1f; // Novagram: source pixel aspect (SAR) for the round crop
+    // Novagram: source size as it is actually DISPLAYED - the container rotation and the pixel aspect ratio
+    // (SAR) are already applied. That is the space the round-video square crop has to be computed in, because
+    // the transcoder's decoder applies the same rotation before TextureRenderer ever samples the frame.
+    // Both stay 0 until the player reports a size; getRoundVideoDisplaySize() then falls back to the demuxer.
+    private float roundVideoDisplayWidth;
+    private float roundVideoDisplayHeight;
+    // Cached square side. fixVideoWidthHeight() spins up (and releases) a MediaCodec encoder, so it must not
+    // run on every timeline drag; invalidated whenever the source or its reported display size changes.
+    private int roundVideoSideCached;
 
     private boolean isUnalivePhoto() {
         if (sendPhotoType == SELECT_TYPE_STICKER) return true;
@@ -9973,6 +9981,47 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
         return result;
     }
 
+    // Novagram: source size of the current video in DISPLAY space, written into out[0]/out[1].
+    // Preferred source is the player, which reports the size with the container rotation and the pixel
+    // aspect ratio already applied. Until it has reported we fall back to the demuxer's coded size plus the
+    // container's rotation tag - correct for rotation, only blind to a non-square pixel aspect.
+    private void getRoundVideoDisplaySize(float[] out) {
+        float w = roundVideoDisplayWidth;
+        float h = roundVideoDisplayHeight;
+        if (w <= 0 || h <= 0) {
+            w = Math.max(1, originalWidth);
+            h = Math.max(1, originalHeight);
+            if (rotationValue == 90 || rotationValue == 270) {
+                final float swap = w;
+                w = h;
+                h = swap;
+            }
+        }
+        out[0] = w;
+        out[1] = h;
+    }
+
+    // Novagram: side of the square a round video note is encoded at. Matches Telegram's own camera notes
+    // (server-configured roundVideoSize, 384 by default) and never upscales past the source.
+    private int getRoundVideoSide() {
+        if (roundVideoSideCached > 0) {
+            return roundVideoSideCached;
+        }
+        final float[] size = new float[2];
+        getRoundVideoDisplaySize(size);
+        final int maxSide = Math.max(64, Math.min(1280, MessagesController.getInstance(currentAccount).roundVideoSize));
+        final int target = Math.min(maxSide, Math.max(2, Math.round(Math.min(size[0], size[1]))));
+        final int[] fixed = fixVideoWidthHeight(target, target);
+        // fixVideoWidthHeight clamps width and height against separate encoder ranges, so collapse them back
+        // to a single value: a video note frame must never come out non-square.
+        return roundVideoSideCached = Math.max(fixed[0], fixed[1]);
+    }
+
+    // Novagram: same bitrate Telegram uses for its own round notes (server-configured, 1000 * 1024 by default).
+    private int getRoundVideoBitrate() {
+        return Math.max(100_000, MessagesController.getInstance(currentAccount).roundVideoBitrate * 1024);
+    }
+
     private VideoEditedInfo getCurrentVideoEditedInfo() {
         if (!isCurrentVideo && hasAnimatedMediaEntities() && centerImage.getBitmapWidth() > 0) {
             float maxSize = 854;
@@ -10121,37 +10170,42 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             // round_message flag added in SendMessagesHelper is what makes every client render it as a
             // circle. This path always transcodes (a cropState is set), so it runs off the UI thread.
             videoEditedInfo.roundVideo = true;
-            // Guard against a not-yet-measured source (0 dims) so cropPw/cropPh never divide by zero and the
-            // square is always valid and even (H.264 requires even dimensions — fixVideoWidthHeight enforces it).
-            final int ow = Math.max(1, originalWidth);
-            final int oh = Math.max(1, originalHeight);
-            // Novagram fix: build the centered square in DISPLAY space, correcting for a non-square pixel
-            // aspect (SAR / pixelWidthHeightRatio). Some devices' gallery videos store non-square pixels
-            // (e.g. 720x480 shown as 16:9); cropping a square of the RAW pixels then stretched the note on
-            // exactly those devices. When SAR == 1 (the vast majority, incl. the dev phone) dispW/dispH equal
-            // ow/oh, so the crop fractions + size are byte-identical to before — no regression for working videos.
-            final float sar = roundVideoPixelWidthHeightRatio > 0 ? roundVideoPixelWidthHeightRatio : 1f;
-            final float dispW = ow * sar;
-            final float dispH = oh;
+            // The crop fractions are read by TextureRenderer AFTER the decoder has applied the container
+            // rotation, so they must describe the frame as it is displayed, not as it is coded. Building them
+            // from the raw coded size is what stretched the note: a phone recording is stored landscape
+            // (1920x1080) with a "rotate 90" tag, so the square was cut across the wrong axis and then
+            // squashed into the output. getRoundVideoDisplaySize() hands back the rotated, SAR-corrected size.
+            final float[] displaySize = new float[2];
+            getRoundVideoDisplaySize(displaySize);
+            // A user rotation from the crop editor makes TextureRenderer map the source's height axis onto the
+            // output's width axis, so the two fractions swap roles - the same rule the normal crop path applies
+            // when it derives transformWidth/transformHeight. Pan/zoom from that editor is intentionally
+            // dropped: a note is always the centred square.
+            final MediaController.CropState userCrop = editState.cropState;
+            final int userRotation = userCrop != null ? userCrop.transformRotation : 0;
+            final boolean axisSwapped = userRotation == 90 || userRotation == 270;
+            final float axisW = axisSwapped ? displaySize[1] : displaySize[0];
+            final float axisH = axisSwapped ? displaySize[0] : displaySize[1];
             MediaController.CropState crop = new MediaController.CropState();
             crop.cropScale = 1f;
             crop.cropPx = 0f;
             crop.cropPy = 0f;
-            if (dispW >= dispH) {
-                crop.cropPw = dispH / dispW;
+            crop.transformRotation = userRotation;
+            crop.mirrored = userCrop != null && userCrop.mirrored;
+            if (axisW >= axisH) {
+                crop.cropPw = axisH / axisW;
                 crop.cropPh = 1f;
             } else {
                 crop.cropPw = 1f;
-                crop.cropPh = dispW / dispH;
+                crop.cropPh = axisW / axisH;
             }
-            final int target = Math.min(512, Math.max(2, Math.round(Math.min(dispW, dispH))));
-            final int[] roundSize = fixVideoWidthHeight(target, target);
-            crop.transformWidth = roundSize[0];
-            crop.transformHeight = roundSize[1];
+            final int side = getRoundVideoSide();
+            crop.transformWidth = side;
+            crop.transformHeight = side;
             videoEditedInfo.cropState = crop;
-            videoEditedInfo.rotationValue = rotationValue;
+            videoEditedInfo.rotationValue = (rotationValue + userRotation) % 360;
             videoEditedInfo.muted = muteVideo;
-            videoEditedInfo.bitrate = 1_000_000;
+            videoEditedInfo.bitrate = getRoundVideoBitrate();
             // Hard safety cap: a round video note must never exceed 60s no matter what the trim slider shows
             // (e.g. if a later mute toggle reset its max-progress-diff). Clamp the end here at the source of truth.
             final long durationUs = (long) (videoDuration * 1000);
@@ -10848,9 +10902,19 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
 
                 @Override
                 public void onVideoSizeChanged(int width, int height, int unappliedRotationDegrees, float pixelWidthHeightRatio) {
-                    // Novagram: remember the pixel aspect ratio (SAR) so the round-video square crop can be
-                    // computed in display space, not raw-pixel space (fixes stretch on non-square-pixel videos).
-                    roundVideoPixelWidthHeightRatio = pixelWidthHeightRatio > 0 ? pixelWidthHeightRatio : 1f;
+                    // Novagram: remember the DISPLAY size of the source for the round-video square crop. The
+                    // player hands us the size with the container rotation already applied (MediaCodec rotates
+                    // when decoding to a surface, so ExoPlayer swaps w/h and inverts the SAR itself) - the same
+                    // orientation the transcoder will see. Deriving the crop from the raw coded size instead
+                    // squeezed every rotated clip: an ordinary phone recording is stored landscape + "rotate 90".
+                    final float roundSar = pixelWidthHeightRatio > 0 ? pixelWidthHeightRatio : 1f;
+                    final float roundW = (unappliedRotationDegrees == 90 || unappliedRotationDegrees == 270 ? height : width) * roundSar;
+                    final float roundH = unappliedRotationDegrees == 90 || unappliedRotationDegrees == 270 ? width : height;
+                    if (roundW != roundVideoDisplayWidth || roundH != roundVideoDisplayHeight) {
+                        roundVideoDisplayWidth = roundW;
+                        roundVideoDisplayHeight = roundH;
+                        roundVideoSideCached = 0;
+                    }
                     if (aspectRatioFrameLayout != null) {
                         if (unappliedRotationDegrees == 90 || unappliedRotationDegrees == 270) {
                             int temp = width;
@@ -21683,8 +21747,15 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             endTime = (long) (videoCutEnd * videoDuration) * 1000;
         }
 
+        long subtitleSize = estimatedSize;
+        if (sendAsRoundVideo) {
+            // Novagram: a round note is always re-encoded to a square at Telegram's note bitrate, so report
+            // that instead of what the plain-video compression path would have produced.
+            width = height = getRoundVideoSide();
+            subtitleSize = Math.max(1, (long) (getRoundVideoBitrate() / 8.0 * (estimatedDuration / 1000.0)));
+        }
         String videoDimension = String.format("%dx%d", width, height);
-        String videoTimeSize = String.format("%s, ~%s", AndroidUtilities.formatShortDuration((int) (estimatedDuration / 1000)), AndroidUtilities.formatFileSize(estimatedSize));
+        String videoTimeSize = String.format("%s, ~%s", AndroidUtilities.formatShortDuration((int) (estimatedDuration / 1000)), AndroidUtilities.formatFileSize(subtitleSize));
         currentSubtitle = String.format("%s, %s", videoDimension, videoTimeSize);
         actionBar.beginDelayedTransition();
         if (customTitle == null) {
@@ -21992,7 +22063,10 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
 
         compressionsCount = -1;
         rotationValue = 0;
-        roundVideoPixelWidthHeightRatio = 1f; // reset per video; onVideoSizeChanged sets the real SAR
+        // Novagram: reset per video; onVideoSizeChanged fills in the real display size.
+        roundVideoDisplayWidth = 0f;
+        roundVideoDisplayHeight = 0f;
+        roundVideoSideCached = 0;
         videoFramerate = 25;
         File file = new File(videoPath);
         originalSize = file.length();
@@ -22036,6 +22110,9 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
 
                     if (videoConvertSupported) {
                         rotationValue = params[AnimatedFileDrawable.PARAM_NUM_ROTATION];
+                        // Novagram: the demuxer's size/rotation are the round-crop fallback until the player
+                        // reports, and they only land here - drop anything cached from the previous video.
+                        roundVideoSideCached = 0;
                         updateWidthHeightBitrateForCompression();
 
                         if (selectedCompression > compressionsCount - 1) {
