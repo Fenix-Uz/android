@@ -190,7 +190,19 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
     private fun step(itemId: Int, titleCode: Int, bodyCode: Int): FenixTour.Step =
         FenixTour.Step(itemId, LanguageCode.getMyTitles(titleCode), LanguageCode.getMyTitles(bodyCode))
 
-    /** The full walkthrough: every Novagram feature on this screen, in order. Used both on first open and replay. */
+    /**
+     * The full walkthrough: every feature row on this screen.
+     *
+     * Kept in the SAME order as [fillItems] builds the list — the tour scrolls to each row in turn, so a
+     * step that sits out of order makes the list jump backwards mid-tour. Add a step here whenever a row is
+     * added above, or the new feature simply never gets explained.
+     *
+     * Rows that are only shown conditionally (the voice mic needs a speech recogniser) are listed anyway:
+     * FenixTour skips a stop whose row is not in the list.
+     *
+     * The three confirmation toggles share one stop — they differ by a single word, and three
+     * near-identical coach marks in a row is worse than one that names all three.
+     */
     private fun fullSteps(): List<FenixTour.Step> = listOf(
         step(STORY_GHOST, 232, 233),
         step(STORY_HIDE, 136, 137),
@@ -200,14 +212,17 @@ class FenixSettings @JvmOverloads constructor(private val targetUrl: String? = n
         step(DOWNLOAD_STOP, 183, 196),
         step(AUTO_ANSWER_ACTIVE, 228, 239),
         step(GHOST_MODE, 32, 245),
+        step(GHOST_ACTIONBAR_BTN, 342, 343),
         step(SECRET_CHAT, 213, 217),
-        step(CONFIRM_STICKER, 190, 191),
+        step(CONFIRM_STICKER, 190, 386),
+        step(ROUND_CAMERA_FRONT, 353, 354),
+        step(VOICE_MIC, 381, 382),
         step(FOLDER_ICONS, 240, 241),
         step(HIDE_TABS, 260, 261),
         step(AUTO_ACCEPT_JOIN, 263, 264),
         step(REMINDER_ENABLED, 270, 271),
         step(STRANGER_SHIELD, 319, 320),
-        step(ROUND_CAMERA_FRONT, 353, 354)
+        step(APK_SHIELD, 378, 379)
     )
 
     private fun startTour() {
