@@ -35,11 +35,10 @@ Both are stored on the device only; nothing is uploaded anywhere.
 - Forward messages without revealing the original sender.
 - QR and bot login flows.
 - Up to 32 signed-in accounts, with per-account notification switches.
+- First-launch guided tour of the feature set, replayable from the settings toolbar.
 
 **Regional**
 - Auto-proxy for censored regions, gated to physically Russian devices and driven entirely from Firebase Remote Config — no proxy credentials live in this repository.
-- Sponsored-channel search results served by the VipAds backend.
-- First-launch guided tour of the feature set, replayable from the settings toolbar.
 
 ## Building from source
 
