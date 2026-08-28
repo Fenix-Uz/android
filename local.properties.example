@@ -7,3 +7,9 @@ sdk.dir=/path/to/your/Android/Sdk
 # Get your own at https://my.telegram.org
 TELEGRAM_APP_ID=
 TELEGRAM_APP_HASH=
+
+# RuStore build only (TMessagesProj_AppRustore).
+# Optional: defaults to 6658 / 12.9.0 if left blank. The version code must be
+# higher than the one currently published on RuStore.
+RUSTORE_VERSION_CODE=
+RUSTORE_VERSION_NAME=
