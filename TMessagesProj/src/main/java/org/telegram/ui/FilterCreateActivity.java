@@ -220,6 +220,9 @@ public class FilterCreateActivity extends BaseFragment {
         }
         newNeverShow = new ArrayList<>(filter.neverShow);
         newPinned = filter.pinnedDialogs.clone();
+        // Fenix: a brand-new folder reuses a free id that a deleted folder may have owned, so only an
+        // existing folder inherits a stored icon.
+        newFolderIcon = creatingNew ? 0 : FolderIcons.INSTANCE.getSelectedIconRes(filter.id);
     }
 
     private int requestingInvitesReqId;
@@ -1286,7 +1289,10 @@ public class FilterCreateActivity extends BaseFragment {
         if (enabled) {
             enabled = (newFilterFlags & MessagesController.DIALOG_FILTER_FLAG_ALL_CHATS) != 0 || !newAlwaysShow.isEmpty();
             if (enabled && !creatingNew) {
-                enabled = hasChanges();
+                // Fenix: the icon is stored on the device, so hasChanges() (which only compares what
+                // goes to the server) never sees it -- check it separately or the folder cannot be
+                // saved when the icon is the only thing the user touched.
+                enabled = hasChanges() || newFolderIcon != FolderIcons.INSTANCE.getSelectedIconRes(filter.id);
             }
         }
         if (doneItem.isEnabled() == enabled) {
@@ -1532,16 +1538,25 @@ public class FilterCreateActivity extends BaseFragment {
                     cell.editTextEmoji.getEditText().setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
 
                     // Fenix: a folder-icon button next to the name field; tapping it opens the icon picker.
-                    if (newFolderIcon == 0) {
-                        newFolderIcon = FolderIcons.INSTANCE.getSelectedIconRes(filter.id);
+                    // The icon goes INSIDE the cell on purpose. onViewDetachedFromWindow() below casts
+                    // holder.itemView to EditEmojiTextCell, so the cell has to stay the item view --
+                    // wrapping it in a FrameLayout threw ClassCastException as soon as the row was
+                    // scrolled off screen or re-bound by DiffUtil.
+                    final ViewGroup.LayoutParams editLp = cell.editTextEmoji.getLayoutParams();
+                    if (editLp instanceof ViewGroup.MarginLayoutParams) {
+                        final ViewGroup.MarginLayoutParams mlp = (ViewGroup.MarginLayoutParams) editLp;
+                        if (LocaleController.isRTL) {
+                            mlp.rightMargin = dp(64);
+                        } else {
+                            mlp.leftMargin = dp(64);
+                        }
+                        cell.editTextEmoji.setLayoutParams(mlp);
                     }
-                    FrameLayout iconWrap = new FrameLayout(mContext);
-                    iconWrap.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
-                    iconWrap.addView(cell, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.CENTER_VERTICAL, LocaleController.isRTL ? 0 : 64, 0, !LocaleController.isRTL ? 0 : 64, 0));
-                    ImageView folderIconView = new ImageView(mContext);
+                    final ImageView folderIconView = new ImageView(mContext);
                     folderIconView.setScaleType(ImageView.ScaleType.CENTER);
-                    folderIconView.setImageResource(newFolderIcon != 0 ? newFolderIcon : R.drawable.msg_folders);
+                    folderIconView.setImageResource(newFolderIcon != 0 ? newFolderIcon : FolderIcons.INSTANCE.getDEFAULT_ICON());
                     folderIconView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon), PorterDuff.Mode.MULTIPLY));
+                    folderIconView.setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_listSelector), Theme.RIPPLE_MASK_CIRCLE_20DP));
                     folderIconView.setOnClickListener(v -> new CreateFolderIconBottomSheetDialog(mContext, newFolderIcon, new Function1<Integer, Unit>() {
                         @Override
                         public Unit invoke(Integer icon) {
@@ -1551,8 +1566,8 @@ public class FilterCreateActivity extends BaseFragment {
                             return null;
                         }
                     }));
-                    iconWrap.addView(folderIconView, LayoutHelper.createFrame(48, 48, (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP, 6, 2, 6, 0));
-                    view = iconWrap;
+                    cell.addView(folderIconView, LayoutHelper.createFrame(48, 48, (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP, 6, 2, 6, 0));
+                    view = cell;
                     break;
                 }
                 case VIEW_TYPE_SHADOW:
