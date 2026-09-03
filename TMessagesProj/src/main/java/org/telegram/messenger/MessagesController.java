@@ -9383,8 +9383,13 @@ public class MessagesController extends BaseController implements NotificationCe
                 } else {
                     markDialogMessageAsDeleted(dialogId, messages);
                 }
-                getMessagesStorage().markMessagesAsDeleted(dialogId, messages, true, forAll, 0, topicId, false, whoDeleted);
-                getMessagesStorage().updateDialogsWithDeletedMessages(dialogId, channelId, messages, null, true);
+                // Novagram: the delete-save hook in markMessagesAsDeletedInternal() drops the ids it preserves
+                // from this list, on the storage queue -- while the messagesDeleted notification hands the very
+                // same list to the UI thread. SharedMediaPreloader read it as it shrank and crashed on get().
+                // Storage gets its own copy; observers keep the full list, which is what upstream always passed.
+                final ArrayList<Integer> storageMessages = new ArrayList<>(messages);
+                getMessagesStorage().markMessagesAsDeleted(dialogId, storageMessages, true, forAll, 0, topicId, false, whoDeleted);
+                getMessagesStorage().updateDialogsWithDeletedMessages(dialogId, channelId, storageMessages, null, true);
             }
             getNotificationCenter().postNotificationName(NotificationCenter.messagesDeleted, messages, channelId, scheduled, false, movedToScheduled, movedToScheduledMessageId);
         } else {
@@ -9545,8 +9550,13 @@ public class MessagesController extends BaseController implements NotificationCe
 
         markDialogMessageAsDeleted(dialogId, messages);
         getMessagesStorage().deleteEphemeralMessages(dialogId, ephemeralMessage.getEphemeralId());
-        getMessagesStorage().markMessagesAsDeleted(dialogId, messages, true, true, 0, topicId);
-        getMessagesStorage().updateDialogsWithDeletedMessages(dialogId, channelId, messages, null);
+        // Novagram: the delete-save hook in markMessagesAsDeletedInternal() drops the ids it preserves
+        // from this list, on the storage queue -- while the messagesDeleted notification hands the very
+        // same list to the UI thread. SharedMediaPreloader read it as it shrank and crashed on get().
+        // Storage gets its own copy; observers keep the full list, which is what upstream always passed.
+        final ArrayList<Integer> storageMessages = new ArrayList<>(messages);
+        getMessagesStorage().markMessagesAsDeleted(dialogId, storageMessages, true, true, 0, topicId);
+        getMessagesStorage().updateDialogsWithDeletedMessages(dialogId, channelId, storageMessages, null);
         getNotificationCenter().postNotificationName(NotificationCenter.messagesDeleted, messages, channelId, false, false, false, 0);
 
         final TLRPC.TL_ephemeral_deleteMessage req = new TLRPC.TL_ephemeral_deleteMessage();
@@ -17646,8 +17656,13 @@ public class MessagesController extends BaseController implements NotificationCe
                 }
             });
             getMessagesStorage().deletePushMessages(dialogId, ids);
-            ArrayList<Long> dialogIds = getMessagesStorage().markMessagesAsDeleted(dialogId, ids, false, true, 0, 0);
-            getMessagesStorage().updateDialogsWithDeletedMessages(dialogId, channelId, ids, dialogIds);
+            // Novagram: the delete-save hook in markMessagesAsDeletedInternal() drops the ids it preserves
+            // from this list, on the storage queue -- while the messagesDeleted notification hands the very
+            // same list to the UI thread. SharedMediaPreloader read it as it shrank and crashed on get().
+            // Storage gets its own copy; observers keep the full list, which is what upstream always passed.
+            final ArrayList<Integer> storageIds = new ArrayList<>(ids);
+            ArrayList<Long> dialogIds = getMessagesStorage().markMessagesAsDeleted(dialogId, storageIds, false, true, 0, 0);
+            getMessagesStorage().updateDialogsWithDeletedMessages(dialogId, channelId, storageIds, dialogIds);
         });
     }
 
@@ -21220,9 +21235,14 @@ public class MessagesController extends BaseController implements NotificationCe
             for (int a = 0, size = deletedMessages.size(); a < size; a++) {
                 long key = deletedMessages.keyAt(a);
                 ArrayList<Integer> arrayList = deletedMessages.valueAt(a);
+                // Novagram: the delete-save hook in markMessagesAsDeletedInternal() drops the ids it preserves
+                // from this list, on the storage queue -- while the messagesDeleted notification hands the very
+                // same list to the UI thread. SharedMediaPreloader read it as it shrank and crashed on get().
+                // Storage gets its own copy; observers keep the full list, which is what upstream always passed.
+                final ArrayList<Integer> storageIds = new ArrayList<>(arrayList);
                 getMessagesStorage().getStorageQueue().postRunnable(() -> {
-                    ArrayList<Long> dialogIds = getMessagesStorage().markMessagesAsDeleted(key, arrayList, false, true, 0, 0);
-                    getMessagesStorage().updateDialogsWithDeletedMessages(key, -key, arrayList, dialogIds);
+                    ArrayList<Long> dialogIds = getMessagesStorage().markMessagesAsDeleted(key, storageIds, false, true, 0, 0);
+                    getMessagesStorage().updateDialogsWithDeletedMessages(key, -key, storageIds, dialogIds);
                 });
             }
         }
@@ -21241,7 +21261,11 @@ public class MessagesController extends BaseController implements NotificationCe
             for (int a = 0, size = scheduledDeletedMessages.size(); a < size; a++) {
                 long key = scheduledDeletedMessages.keyAt(a);
                 ArrayList<Integer> arrayList = scheduledDeletedMessages.valueAt(a);
-                getMessagesStorage().markMessagesAsDeleted(key, arrayList, true, false, ChatActivity.MODE_SCHEDULED, 0);
+                // Novagram: the delete-save hook in markMessagesAsDeletedInternal() drops the ids it preserves
+                // from this list, on the storage queue -- while the messagesDeleted notification hands the very
+                // same list to the UI thread. SharedMediaPreloader read it as it shrank and crashed on get().
+                // Storage gets its own copy; observers keep the full list, which is what upstream always passed.
+                getMessagesStorage().markMessagesAsDeleted(key, new ArrayList<>(arrayList), true, false, ChatActivity.MODE_SCHEDULED, 0);
             }
         }
         if (clearHistoryMessages != null) {
