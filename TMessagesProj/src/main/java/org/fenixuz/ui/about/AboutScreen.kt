@@ -78,6 +78,7 @@ class AboutScreen : BaseFragment() {
         }
 
         column.addView(heroCard(context))
+        column.addView(channelsCard(context), spacedCard())
         column.addView(supportCard(context), spacedCard())
         column.addView(companyCard(context), spacedCard())
 
@@ -180,6 +181,31 @@ class AboutScreen : BaseFragment() {
             // marginStart/End (not left/right) so the gap mirrors correctly under RTL locales.
             if (first) marginEnd = dp(5) else marginStart = dp(5)
         }
+
+    // ---- Channels card ---------------------------------------------------------------------------------------
+
+    // Novagram: our two official channels. They used to be pushed at people as a synthetic first row of the
+    // chat list, which read as an ad nobody asked for -- this is the same link, somewhere people come to look.
+    private fun channelsCard(context: Context): View {
+        val card = card(context)
+        card.addView(header(context, LanguageCode.getMyTitles(387)))     // Our channels
+        card.addView(
+            row(
+                context, R.drawable.msg_channel, 0xFF1BA4ED.toInt(),
+                LanguageCode.getMyTitles(388),                            // Uzbek channel
+                "@" + CHANNEL_UZ
+            ) { Browser.openUrl(context, "https://t.me/" + CHANNEL_UZ) }
+        )
+        card.addView(divider(context))
+        card.addView(
+            row(
+                context, R.drawable.msg_channel, 0xFF8E7CFF.toInt(),
+                LanguageCode.getMyTitles(389),                            // Russian channel
+                "@" + CHANNEL_RU
+            ) { Browser.openUrl(context, "https://t.me/" + CHANNEL_RU) }
+        )
+        return card
+    }
 
     // ---- Support card ----------------------------------------------------------------------------------------
 
@@ -431,6 +457,9 @@ class AboutScreen : BaseFragment() {
         /** Telegram upstream this fork is built on. Bump only when we actually merge a newer Telegram base. */
         private const val TELEGRAM_BASE = "12.9.0"
         private const val SUPPORT_ADMIN = "Avazbekedu"
+        /** Our two official channels, linked from the About screen. */
+        private const val CHANNEL_UZ = "Novagramtg"
+        private const val CHANNEL_RU = "Novagram_Ru"
         private const val COMPANY_NAME = "VipAds LLC"
         private const val COMPANY_EMAIL = "admin@novagram.org"
         /** Published store package IDs — fixed, so the review link never breaks on a suffixed debug build. */

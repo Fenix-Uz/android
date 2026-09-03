@@ -2448,9 +2448,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             if (!onlySelect && parentPage.isDefaultDialogType() && slidingView == null && viewHolder.itemView instanceof DialogCell) {
                 DialogCell dialogCell = (DialogCell) viewHolder.itemView;
                 long dialogId = dialogCell.getDialogId();
-                if (org.fenixuz.channel.NovaPromoChannel.isPromoDialog(currentAccount, dialogId)) {
-                    return 0; // Novagram: the promo channel row is not swipeable.
-                }
                 if (actionBar.isActionModeShowed(null)) {
                     TLRPC.Dialog dialog = getMessagesController().dialogs_dict.get(dialogId);
                     if (!allowMoving || dialog == null || !isDialogPinned(dialog) || DialogObject.isFolderDialogId(dialogId)) {
@@ -7136,11 +7133,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 return false;
             });
         }
-        // Novagram: refresh the "own channel at top" promo — resolves at most once per session and
-        // shows the row only while the user has not joined (it removes itself once they subscribe).
-        if (folderId == 0 && !onlySelect) {
-            org.fenixuz.channel.NovaPromoChannel.reconcile(currentAccount);
-        }
         if (dialogStoriesCell != null) {
             dialogStoriesCell.onResume();
         }
@@ -8089,10 +8081,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     return;
                 }
                 dialogId = dialog.id;
-                if (org.fenixuz.channel.NovaPromoChannel.isPromoDialog(currentAccount, dialogId)) {
-                    // Novagram: promo channel is tap-to-open only — never selectable. It stays in the
-                    // list until the user joins (reconcile removes it once membership is detected).
-                } else if (actionBar.isActionModeShowed(null)) {
+                if (actionBar.isActionModeShowed(null)) {
                     showOrUpdateActionMode(dialogId, view);
                     return;
                 }
@@ -8481,10 +8470,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             return false;
         }
         if (adapter.getItemViewType(position) == DialogsAdapter.VIEW_TYPE_FORWARD_TO_STORIES_CELL) {
-            return false;
-        }
-        // Novagram: the promo channel row is tap-to-open only — no selection / context menu / preview.
-        if (view instanceof DialogCell && org.fenixuz.channel.NovaPromoChannel.isPromoDialog(currentAccount, ((DialogCell) view).getDialogId())) {
             return false;
         }
 
@@ -8896,10 +8881,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             for (int a = 0, N = dialogs.size(); a < N; a++) {
                 TLRPC.Dialog dialog1 = dialogs.get(a);
                 if (dialog1 instanceof TLRPC.TL_dialogFolder) {
-                    continue;
-                }
-                // Novagram: don't count our promo row toward the pin limit.
-                if (org.fenixuz.channel.NovaPromoChannel.isPromoDialog(currentAccount, dialog1.id)) {
                     continue;
                 }
                 if (isDialogPinned(dialog1)) {
@@ -9354,10 +9335,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             if (dialog instanceof TLRPC.TL_dialogFolder) {
                 continue;
             }
-            // Novagram: our promo row isn't a real pin — don't count it toward the pin limit.
-            if (org.fenixuz.channel.NovaPromoChannel.isPromoDialog(currentAccount, dialog.id)) {
-                continue;
-            }
             if (isDialogPinned(dialog)) {
                 pinnedCount++;
             } else if (!getMessagesController().isPromoDialog(dialog.id, false)) {
@@ -9495,10 +9472,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             for (int a = 0, N = dialogs.size(); a < N; a++) {
                 TLRPC.Dialog dialog = dialogs.get(a);
                 if (dialog instanceof TLRPC.TL_dialogFolder) {
-                    continue;
-                }
-                // Novagram: don't count our promo row toward the pin limit.
-                if (org.fenixuz.channel.NovaPromoChannel.isPromoDialog(currentAccount, dialog.id)) {
                     continue;
                 }
                 if (isDialogPinned(dialog)) {

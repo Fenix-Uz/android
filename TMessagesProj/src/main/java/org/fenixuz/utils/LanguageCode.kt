@@ -1765,6 +1765,12 @@ object LanguageCode {
         // Tour body for the confirmation-dialogs group. The three rows there differ by one word, so the
         // walkthrough covers them in a single stop rather than three near-identical coach marks.
         titlesLanguages.add(TitleLanguages(386, "Ask for confirmation before sending a sticker, voice message or GIF, so nothing goes out by accident.", "Stiker, ovozli xabar yoki GIF yuborishdan oldin tasdiqlashni so'raydi — tasodifan yuborib qo'ymaysiz.", "Спрашивает подтверждение перед отправкой стикера, голосового сообщения или GIF — ничего не уйдёт случайно."))
+
+        titlesLanguages.add(TitleLanguages(387, "Our channels", "Bizning kanallarimiz", "Наши каналы"))
+
+        titlesLanguages.add(TitleLanguages(388, "Uzbek channel", "O'zbekcha kanal", "Канал на узбекском"))
+
+        titlesLanguages.add(TitleLanguages(389, "Russian channel", "Ruscha kanal", "Канал на русском"))
     }
 
     init {

@@ -10117,8 +10117,6 @@ public class MessagesController extends BaseController implements NotificationCe
                 getNotificationCenter().postNotificationName(NotificationCenter.dialogDeleted, did, 0);
                 getNotificationsController().deleteNotificationChannel(did, 0);
                 JoinCallAlert.processDeletedChat(currentAccount, did);
-                // Novagram: if the user just left our promo channel, bring the promo row back.
-                org.fenixuz.channel.NovaPromoChannel.onDialogDeleted(currentAccount, did);
             }
             if (onlyHistory == 0) {
                 getMediaDataController().cleanDraft(did, 0, false);
@@ -17205,11 +17203,6 @@ public class MessagesController extends BaseController implements NotificationCe
                 if (dialog instanceof TLRPC.TL_dialogFolder) {
                     continue;
                 }
-                // Novagram: never send our synthetic promo channel to the server's pinned order — it
-                // isn't a real dialog, and doing so would fail the whole reorder on every pin/unpin.
-                if (org.fenixuz.channel.NovaPromoChannel.isPromoDialog(currentAccount, dialog.id)) {
-                    continue;
-                }
                 if (!dialog.pinned) {
                     if (dialog.id != promoDialogId) {
                         break;
@@ -17276,10 +17269,6 @@ public class MessagesController extends BaseController implements NotificationCe
                 if (d instanceof TLRPC.TL_dialogFolder) {
                     continue;
                 }
-                // Novagram: skip our promo row — its sentinel pinnedNum would overflow maxPinnedNum+1.
-                if (org.fenixuz.channel.NovaPromoChannel.isPromoDialog(currentAccount, d.id)) {
-                    continue;
-                }
                 if (!d.pinned) {
                     if (d.id != promoDialogId) {
                         break;
@@ -17337,46 +17326,6 @@ public class MessagesController extends BaseController implements NotificationCe
         }
         getMessagesStorage().setDialogPinned(dialogId, dialog.pinnedNum);
         return true;
-    }
-
-    // Novagram: inject/remove the synthetic "own channel" promo dialog. Decision logic lives in
-    // org.fenixuz.channel.NovaPromoChannel; these two primitives just touch the model + resort.
-    // Add is refused when a REAL dialog already exists at that id (i.e. the user is a member).
-    public boolean novaAddPromoDialog(TLRPC.Dialog dialog) {
-        if (dialog == null || dialogs_dict.get(dialog.id) != null) {
-            return false;
-        }
-        dialogs_dict.put(dialog.id, dialog);
-        allDialogs.add(dialog);
-        sortDialogs(null);
-        getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
-        return true;
-    }
-
-    public void novaRemovePromoDialog(TLRPC.Dialog dialog, boolean loadRealIfMissing) {
-        if (dialog == null) {
-            return;
-        }
-        allDialogs.remove(dialog);
-        TLRPC.Dialog current = dialogs_dict.get(dialog.id);
-        if (current == dialog) {
-            // Only our synthetic sits at this id.
-            dialogs_dict.remove(dialog.id);
-            if (loadRealIfMissing) {
-                // The user just joined but the real dialog hasn't synced yet — fetch it explicitly so
-                // the channel shows as a normal chat instead of vanishing when we drop our row.
-                TLRPC.InputPeer peer = getInputPeer(dialog.id);
-                if (peer != null && !(peer instanceof TLRPC.TL_inputPeerEmpty)) {
-                    loadUnknownDialog(peer, 0);
-                }
-            }
-        } else if (current != null && !allDialogs.contains(current)) {
-            // A real dialog already took the id in dialogs_dict but the incremental update path left it
-            // out of allDialogs (our row occupied the slot) — re-add it so the real channel keeps showing.
-            allDialogs.add(current);
-        }
-        sortDialogs(null);
-        getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
     }
 
     public void loadPinnedDialogs(final int folderId, long newDialogId, ArrayList<Long> order) {
@@ -17493,11 +17442,6 @@ public class MessagesController extends BaseController implements NotificationCe
                     for (int a = 0; a < dialogs.size(); a++) {
                         TLRPC.Dialog dialog = dialogs.get(a);
                         if (dialog instanceof TLRPC.TL_dialogFolder) {
-                            continue;
-                        }
-                        // Novagram: our synthetic promo isn't a server pin — skip it so this
-                        // reconciliation never unpins it (which would sink it to the bottom).
-                        if (org.fenixuz.channel.NovaPromoChannel.isPromoDialog(currentAccount, dialog.id)) {
                             continue;
                         }
                         if (DialogObject.isEncryptedDialog(dialog.id)) {
