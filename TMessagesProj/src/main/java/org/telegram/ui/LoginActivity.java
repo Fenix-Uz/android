@@ -6155,10 +6155,23 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             bottomContainer.addView(signInWithGoogleView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.LEFT, 0, 0, 0, 24));
             bottomContainer.addView(loginOrView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, 16, Gravity.BOTTOM | Gravity.LEFT, 0, 0, 0, 70));
             loginOrView.setMeasureAfter(signInWithGoogleView);
+            if (!BuildVars.SUPPORTS_GOOGLE_EMAIL_SIGNIN || TextUtils.isEmpty(BuildVars.GOOGLE_AUTH_CLIENT_ID)) {
+                // Novagram: setParams() is the usual place this is decided, but it never runs when the
+                // page is opened as a login-email suggestion (SETUP_LOGIN_EMAIL) or from Settings --
+                // changeEmail() jumps straight to VIEW_ADD_EMAIL with no Bundle, so the button kept its
+                // default VISIBLE. Hide it up front.
+                signInWithGoogleView.setVisibility(GONE);
+                loginOrView.setVisibility(GONE);
+            }
             addView(bottomContainer, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
             VerticalPositionAutoAnimator.attach(bottomContainer);
 
             bottomContainer.setOnClickListener(view -> {
+                if (!BuildVars.SUPPORTS_GOOGLE_EMAIL_SIGNIN || TextUtils.isEmpty(BuildVars.GOOGLE_AUTH_CLIENT_ID)) {
+                    // Novagram: setParams() already hides the button in this case; this keeps the crash
+                    // impossible even if some other path makes it visible.
+                    return;
+                }
                 NotificationCenter.getGlobalInstance().addObserver(new NotificationCenter.NotificationCenterDelegate() {
                     @Override
                     public void didReceivedNotification(int id, int account, Object... args) {
@@ -6225,7 +6238,15 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             requestPhone = currentParams.getString("phoneFormated");
             phoneHash = currentParams.getString("phoneHash");
 
-            int v = params.getBoolean("googleSignInAllowed") && PushListenerController.GooglePushListenerServiceProvider.INSTANCE.hasServices() ? VISIBLE : GONE;
+            // Novagram: "Sign in with Google" needs the OAuth client id Telegram hands out through its
+            // appConfig ("login_google_oauth_client_id"), and appConfig is only fetched after a successful
+            // login -- during sign-up the value is always whatever BuildVars ships. Our fork ships an empty
+            // one, and requestIdToken() rejects an empty string with IllegalArgumentException, so the app
+            // died the moment anyone tapped this. And even with an id filled in, Telegram's server only
+            // trusts tokens minted for its own OAuth client, so the button cannot work in a fork at all --
+            // BuildVars.SUPPORTS_GOOGLE_EMAIL_SIGNIN keeps it off, the way upstream turns Firebase SMS off
+            // when SAFETYNET_KEY is blank (see setPage's codeSettings).
+            int v = params.getBoolean("googleSignInAllowed") && PushListenerController.GooglePushListenerServiceProvider.INSTANCE.hasServices() && BuildVars.SUPPORTS_GOOGLE_EMAIL_SIGNIN ? VISIBLE : GONE;
             loginOrView.setVisibility(v);
             signInWithGoogleView.setVisibility(v);
 
@@ -6493,6 +6514,11 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             signInWithGoogleView.setText(str);
 
             signInWithGoogleView.setOnClickListener(view -> {
+                if (!BuildVars.SUPPORTS_GOOGLE_EMAIL_SIGNIN || TextUtils.isEmpty(BuildVars.GOOGLE_AUTH_CLIENT_ID)) {
+                    // Novagram: setParams() already hides the button in this case; this keeps the crash
+                    // impossible even if some other path makes it visible.
+                    return;
+                }
                 NotificationCenter.getGlobalInstance().addObserver(new NotificationCenter.NotificationCenterDelegate() {
                     @Override
                     public void didReceivedNotification(int id, int account, Object... args) {
@@ -6840,7 +6866,9 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 confirmTextView.setText(AndroidUtilities.formatSpannable(getString(R.string.CheckYourEmailSubtitle), confirmText));
             }
 
-            int v = params.getBoolean("googleSignInAllowed") && PushListenerController.GooglePushListenerServiceProvider.INSTANCE.hasServices() ? VISIBLE : GONE;
+            // Novagram: off in this fork -- see the note on the same check in
+            // LoginActivitySetupEmail.setParams().
+            int v = params.getBoolean("googleSignInAllowed") && PushListenerController.GooglePushListenerServiceProvider.INSTANCE.hasServices() && BuildVars.SUPPORTS_GOOGLE_EMAIL_SIGNIN ? VISIBLE : GONE;
             loginOrView.setVisibility(v);
             signInWithGoogleView.setVisibility(v);
 

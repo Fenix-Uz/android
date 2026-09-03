@@ -46,6 +46,12 @@ public class BuildVars {
     // works only on official app ids, disable on your forks
     public static boolean SUPPORTS_PASSKEYS = false;
 
+    // Same story for "Sign in with Google" on the login-email pages. The ID token it produces is checked
+    // by Telegram's server against Telegram's own OAuth client, and a fork cannot be issued one -- so the
+    // button can only fail, and with GOOGLE_AUTH_CLIENT_ID empty it crashed outright. Flip this to true
+    // (and fill GOOGLE_AUTH_CLIENT_ID) to try it again; the button follows this flag on its own.
+    public static boolean SUPPORTS_GOOGLE_EMAIL_SIGNIN = false;
+
     public static boolean USE_LEGACY_SYSTEM_INSETS = false;
 
     static {
