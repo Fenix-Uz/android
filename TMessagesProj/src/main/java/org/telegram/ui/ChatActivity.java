@@ -46325,9 +46325,14 @@ public class ChatActivity extends BaseFragment implements
                     icons.add(deleteIconRes);
                 }
                 if (((message.messageOwner.flags & TLRPC.MESSAGE_FLAG_EDITED) != 0 || message.isEditing()) && EditMessage.INSTANCE.getEditMode()) {
-                    items.add(LocaleController.getString(R.string.WebHistory));
+                    // Novagram: our own label and icon. This borrowed R.string.WebHistory -- the in-app
+                    // browser's "History" -- which reads as nothing in particular next to Edit and Delete,
+                    // and with USE_CLOUD_STRINGS on, a translation change to that browser label would
+                    // quietly rename this item. The icon was menu_clear_history, which says "erase the
+                    // history", the opposite of what tapping it does.
+                    items.add(LanguageCode.INSTANCE.getMyTitles(390));
                     options.add(OPTION_FENIX_EDIT_HISTORY);
-                    icons.add(R.drawable.menu_clear_history);
+                    icons.add(R.drawable.menu_views_recent);
                 }
             } else {
                 if ((allowChatActions || isEphemeralFromBot) && !isInsideContainer) {

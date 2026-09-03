@@ -1771,6 +1771,8 @@ object LanguageCode {
         titlesLanguages.add(TitleLanguages(388, "Uzbek channel", "O'zbekcha kanal", "Канал на узбекском"))
 
         titlesLanguages.add(TitleLanguages(389, "Russian channel", "Ruscha kanal", "Канал на русском"))
+
+        titlesLanguages.add(TitleLanguages(390, "Edit history", "Tahrirlar tarixi", "История изменений"))
     }
 
     init {
