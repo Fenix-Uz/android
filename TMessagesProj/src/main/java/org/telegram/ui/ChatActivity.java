@@ -22539,7 +22539,19 @@ public class ChatActivity extends BaseFragment implements
                 this.messages.get(index).forceUpdate = true;
                 this.messages.get(index).deletedBy = DeletedMsg.INSTANCE.whoDeleteStr(fenixBy);
                 if (chatAdapter != null) {
-                    chatAdapter.notifyItemChanged(index);
+                    // Novagram: adapter positions are not messages-list indices. Rows sit above the messages
+                    // -- loadingDownRow whenever newer messages are still loadable, plus the saved-chat hint
+                    // and the forum-thread row -- so a raw index refreshes the wrong row, and every upstream
+                    // notify for a message adds messagesStartRow. The bounds check covers the frozen and
+                    // filtered adapter states, where the rows are built from a different list and this index
+                    // does not map onto them at all; without it the position can land past the item count,
+                    // which is how RecyclerView ends up throwing from tryGetViewHolderForPositionByDeadline.
+                    // Bound against messagesEndRow rather than getItemCount(): that getter reassigns
+                    // botInfoEmptyRow as a side effect, so it is not something to call for a range test.
+                    final int fenixPosition = chatAdapter.messagesStartRow + index;
+                    if (chatAdapter.messagesStartRow >= 0 && fenixPosition < chatAdapter.messagesEndRow) {
+                        chatAdapter.notifyItemChanged(fenixPosition);
+                    }
                 }
             }
             if (DeletedMsg.SIMPLE == fenixDeletedType) {
